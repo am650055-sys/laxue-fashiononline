@@ -175,23 +175,34 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ activeSu
     };
   };
 
-  // Fetch Admin Data
+  // Fetch Admin Data safely without throwing on static hosts
   const loadAdminData = async () => {
     try {
       const headers = getAuthHeader();
-      const [analyticsRes, ordersRes, couponsRes, bannersRes] = await Promise.all([
-        fetch('/api/admin/analytics', { headers }),
-        fetch('/api/orders', { headers }),
-        fetch('/api/coupons', { headers }),
-        fetch('/api/banners', { headers }),
+      const safeFetchJson = async (url: string) => {
+        try {
+          const res = await fetch(url, { headers });
+          const contentType = res.headers.get('content-type') || '';
+          if (res.ok && contentType.includes('application/json')) {
+            return await res.json();
+          }
+        } catch {}
+        return null;
+      };
+
+      const [analyticsData, ordersData, couponsData, bannersData] = await Promise.all([
+        safeFetchJson('/api/admin/analytics'),
+        safeFetchJson('/api/orders'),
+        safeFetchJson('/api/coupons'),
+        safeFetchJson('/api/banners'),
       ]);
 
-      if (analyticsRes.ok) setAnalyticsMetrics(await analyticsRes.json());
-      if (ordersRes.ok) setOrders(await ordersRes.json());
-      if (couponsRes.ok) setCoupons(await couponsRes.json());
-      if (bannersRes.ok) setBanners(await bannersRes.json());
+      if (analyticsData && typeof analyticsData === 'object') setAnalyticsMetrics(analyticsData);
+      if (ordersData && Array.isArray(ordersData)) setOrders(ordersData);
+      if (couponsData && Array.isArray(couponsData)) setCoupons(couponsData);
+      if (bannersData && Array.isArray(bannersData)) setBanners(bannersData);
     } catch (err) {
-      console.error('Error fetching admin data:', err);
+      console.warn('Admin data load skipped on static host:', err);
     }
   };
 
