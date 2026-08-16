@@ -27,6 +27,18 @@ import {
 const app = express();
 const PORT = 3000;
 
+// Enable CORS for all incoming requests (including Netlify and custom domains)
+app.use((req: Request, res: Response, next: express.NextFunction) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-admin-token');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
@@ -835,7 +847,9 @@ function requireAdminAuth(req: Request, res: Response, next: express.NextFunctio
 
 // 8. ADMIN AUTHENTICATION
 app.post('/api/admin/login', (req: Request, res: Response) => {
-  const { email, password } = req.body;
+  const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+  const password = typeof req.body?.password === 'string' ? req.body.password.trim() : '';
+
   if ((email === 'admin@luxue.com' || email === 'admin') && password === 'admin123') {
     return res.json({
       success: true,
@@ -847,7 +861,7 @@ app.post('/api/admin/login', (req: Request, res: Response) => {
       },
     });
   }
-  return res.status(401).json({ error: 'Invalid admin credentials' });
+  return res.status(401).json({ error: 'Invalid admin credentials. Default: admin@luxue.com / admin123' });
 });
 
 app.get('/api/admin/verify', (req: Request, res: Response) => {
