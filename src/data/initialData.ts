@@ -21,6 +21,8 @@ export const INITIAL_SETTINGS: StoreSettings = {
     codEnabled: false,
     merchantName: 'LUXUE FASHION ONLINE',
     merchantUpiId: 'luxuefashion@icici',
+    lastUpdated: '2026-08-16T12:00:00.000Z',
+    lastUpdatedBy: 'Admin (System Configuration)',
   },
 };
 

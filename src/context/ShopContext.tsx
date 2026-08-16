@@ -57,6 +57,13 @@ interface ShopContextType {
   navigate: (view: string, productId?: string) => void;
   refreshData: () => Promise<void>;
   updateSettings: (newSettings: Partial<StoreSettings>) => Promise<boolean>;
+  updatePaymentSettings: (payload: {
+    merchantUpiId: string;
+    merchantName: string;
+    upiEnabled: boolean;
+    cardEnabled?: boolean;
+    testModeEnabled?: boolean;
+  }) => Promise<{ success: boolean; message: string; error?: string }>;
 }
 
 const ShopContext = createContext<ShopContextType | undefined>(undefined);
@@ -215,6 +222,48 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return false;
     } catch {
       return false;
+    }
+  };
+
+  const updatePaymentSettings = async (payload: {
+    merchantUpiId: string;
+    merchantName: string;
+    upiEnabled: boolean;
+    cardEnabled?: boolean;
+    testModeEnabled?: boolean;
+  }): Promise<{ success: boolean; message: string; error?: string }> => {
+    try {
+      const token = localStorage.getItem('luxue_admin_token') || 'luxue-admin-jwt-token-2026';
+      const res = await fetch('/api/admin/payment-settings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          'x-admin-token': token,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, message: data.error || 'Failed to update payment settings', error: data.error };
+      }
+
+      if (data.settings) {
+        setSettings(data.settings);
+      } else if (data.paymentSettings) {
+        setSettings(prev => ({
+          ...prev,
+          merchantUpiId: data.paymentSettings.merchantUpiId,
+          merchantName: data.paymentSettings.merchantName,
+          paymentSettings: data.paymentSettings,
+        }));
+      }
+
+      await refreshData();
+      return { success: true, message: data.message || 'Payment settings updated successfully' };
+    } catch (err: any) {
+      return { success: false, message: err.message || 'Network error updating payment settings', error: err.message };
     }
   };
 
@@ -545,6 +594,7 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
         navigate,
         refreshData,
         updateSettings,
+        updatePaymentSettings,
       }}
     >
       {children}

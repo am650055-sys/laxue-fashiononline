@@ -29,15 +29,18 @@ import {
   AlertCircle,
   Loader2,
   Check,
+  QrCode,
 } from 'lucide-react';
 import { useShop } from '../../context/ShopContext';
 import { Product, Order, OrderStatus, Coupon, RakhiOfferConfig, StoreSettings, BannerConfig, Size } from '../../types';
+import { AdminPaymentSettings } from '../../components/admin/AdminPaymentSettings';
 
 export type AdminTab =
   | 'dashboard'
   | 'products'
   | 'categories'
   | 'orders'
+  | 'payment-settings'
   | 'customers'
   | 'inventory'
   | 'rakhi-offer'
@@ -62,6 +65,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ activeSu
         'products',
         'categories',
         'orders',
+        'payment-settings',
         'customers',
         'inventory',
         'rakhi-offer',
@@ -84,6 +88,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ activeSu
         'products',
         'categories',
         'orders',
+        'payment-settings',
         'customers',
         'inventory',
         'rakhi-offer',
@@ -673,9 +678,10 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ activeSu
 
   const tabList: { id: AdminTab; label: string; icon: React.FC<{ className?: string }> }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'payment-settings', label: 'Payment Settings (UPI)', icon: QrCode },
+    { id: 'orders', label: 'Orders & Verifications', icon: ShoppingBag },
     { id: 'products', label: 'Products Catalog', icon: Package },
     { id: 'categories', label: 'Categories', icon: Grid },
-    { id: 'orders', label: 'Orders', icon: ShoppingBag },
     { id: 'customers', label: 'Customers', icon: Users },
     { id: 'inventory', label: 'Inventory Control', icon: Layers },
     { id: 'rakhi-offer', label: 'Rakhi Campaign', icon: Gift },
@@ -821,7 +827,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ activeSu
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     onClick={openNewProductModal}
-                    className="p-4 bg-[#1F060A] hover:bg-[#3B0C13] rounded-2xl border border-[#D4AF37]/40 text-xs font-bold text-[#DFBA67] flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                    className="p-3.5 bg-[#1F060A] hover:bg-[#3B0C13] rounded-2xl border border-[#D4AF37]/40 text-xs font-bold text-[#DFBA67] flex items-center justify-center gap-2 cursor-pointer transition-colors"
                   >
                     <Plus className="w-4 h-4" />
                     <span>Add New Kurti</span>
@@ -829,10 +835,26 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ activeSu
 
                   <button
                     onClick={() => handleTabChange('orders')}
-                    className="p-4 bg-[#1F060A] hover:bg-[#3B0C13] rounded-2xl border border-[#D4AF37]/40 text-xs font-bold text-[#DFBA67] flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                    className="p-3.5 bg-[#1F060A] hover:bg-[#3B0C13] rounded-2xl border border-[#D4AF37]/40 text-xs font-bold text-[#DFBA67] flex items-center justify-center gap-2 cursor-pointer transition-colors"
                   >
                     <ShoppingBag className="w-4 h-4" />
                     <span>View Orders ({orders.length})</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleTabChange('payment-settings')}
+                    className="p-3.5 bg-[#1F060A] hover:bg-[#3B0C13] rounded-2xl border border-[#D4AF37]/40 text-xs font-bold text-[#DFBA67] flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                  >
+                    <QrCode className="w-4 h-4" />
+                    <span>UPI & Payment Setup</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleTabChange('settings')}
+                    className="p-3.5 bg-[#1F060A] hover:bg-[#3B0C13] rounded-2xl border border-[#D4AF37]/40 text-xs font-bold text-[#DFBA67] flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                  >
+                    <Settings className="w-4 h-4" />
+                    <span>Store Details & GSTIN</span>
                   </button>
                 </div>
               </div>
@@ -1447,6 +1469,9 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ activeSu
             </div>
           </div>
         )}
+
+        {/* PAYMENT SETTINGS (UPI & GATEWAY) */}
+        {activeTab === 'payment-settings' && <AdminPaymentSettings />}
 
         {/* 11. BUSINESS SETTINGS */}
         {activeTab === 'settings' && (

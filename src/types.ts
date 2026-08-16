@@ -177,11 +177,14 @@ export interface AdminUser {
 }
 
 export interface PaymentGatewaySettings {
-  upiEnabled: boolean;
+  upiEnabled: boolean; // Payment Status: ON/OFF
+  merchantUpiId: string; // Dynamic UPI ID
+  merchantName: string; // Business/Merchant Name
   cardEnabled: boolean;
   codEnabled: boolean; // permanently false
-  merchantName: string;
-  merchantUpiId: string;
+  lastUpdated?: string;
+  lastUpdatedBy?: string;
+  testModeEnabled?: boolean;
 }
 
 export interface StoreSettings {

@@ -18,6 +18,7 @@ import {
   Loader2,
   CheckCircle2,
   XCircle,
+  CreditCard,
 } from 'lucide-react';
 import { Order } from '../../types';
 import { useShop } from '../../context/ShopContext';
@@ -438,6 +439,58 @@ export const UpiPaymentStep: React.FC<UpiPaymentStepProps> = ({ order, onBack, o
       setProofError(result.message || 'Payment verification failed to submit');
     }
   };
+
+  const isUpiEnabled = settings.paymentSettings?.upiEnabled ?? true;
+
+  if (!isUpiEnabled) {
+    return (
+      <div className="bg-white p-6 sm:p-8 rounded-3xl border border-[#EAE3D2] shadow-sm space-y-6">
+        <div className="flex items-center gap-3 border-b border-[#EAE3D2] pb-4">
+          <button
+            type="button"
+            onClick={onBack}
+            className="w-9 h-9 rounded-full bg-[#FAF6EE] text-[#4A0E17] hover:bg-[#F2EADB] flex items-center justify-center transition-colors cursor-pointer shrink-0"
+            title="Go back"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </button>
+          <div>
+            <h2 className="font-serif-luxury text-xl font-bold text-[#3B0C13]">
+              UPI GATEWAY TEMPORARILY OFFLINE
+            </h2>
+            <p className="text-xs text-[#7A695C]">
+              Scheduled banking switch maintenance in progress
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-amber-50 p-6 rounded-2xl border-2 border-amber-300 text-center space-y-4">
+          <div className="w-12 h-12 rounded-full bg-white border border-amber-400 flex items-center justify-center mx-auto text-amber-700">
+            <AlertCircle className="w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="font-serif-luxury text-base font-bold text-amber-950">
+              Direct UPI Payments are Temporarily Paused
+            </h3>
+            <p className="text-xs text-amber-800 mt-1 max-w-md mx-auto">
+              Our merchant UPI gateway is currently undergoing routine server synchronization. Please complete your order of <strong className="text-amber-950">₹{exactAmount.toLocaleString('en-IN')}</strong> using Credit/Debit card.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onBack}
+              className="bg-[#4A0E17] hover:bg-[#62121E] text-[#DFBA67] font-bold text-xs px-6 py-3.5 rounded-xl border border-[#D4AF37] shadow-md flex items-center gap-2 cursor-pointer transition-all uppercase tracking-wider"
+            >
+              <CreditCard className="w-4 h-4" />
+              <span>CHOOSE CARD PAYMENT INSTEAD</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white p-6 sm:p-8 rounded-3xl border border-[#EAE3D2] shadow-sm space-y-6">
