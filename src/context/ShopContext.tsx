@@ -8,6 +8,7 @@ import {
   ShippingAddress,
   Size,
   StoreSettings,
+  UserProfile,
 } from '../types';
 import {
   INITIAL_PRODUCTS,
@@ -37,7 +38,10 @@ interface ShopContextType {
   activeCategoryFilter: string;
   activeSearchInput: string;
   savedAddress: ShippingAddress | null;
+  userProfile: UserProfile | null;
   // Methods
+  signUp: (userData: { name: string; mobile: string; email: string; shippingAddress?: string }) => void;
+  logOut: () => void;
   setSearchQuery: (query: string) => void;
   setActiveCategoryFilter: (category: string) => void;
   addToCart: (product: Product, size?: Size, color?: string, quantity?: number) => void;
@@ -152,6 +156,38 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   });
 
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(() => {
+    try {
+      const saved = localStorage.getItem('luxue_user_profile');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const signUp = (userData: { name: string; mobile: string; email: string; shippingAddress?: string }) => {
+    const profile: UserProfile = {
+      name: userData.name.trim(),
+      mobile: userData.mobile.trim(),
+      email: userData.email.trim().toLowerCase(),
+      isVip: true,
+      createdAt: new Date().toISOString(),
+      shippingAddress: userData.shippingAddress || (savedAddress ? `${savedAddress.house}, ${savedAddress.street}, ${savedAddress.city}, ${savedAddress.state} - ${savedAddress.pin}` : undefined),
+      addressDetails: savedAddress || undefined,
+    };
+    setUserProfile(profile);
+    try {
+      localStorage.setItem('luxue_user_profile', JSON.stringify(profile));
+    } catch {}
+  };
+
+  const logOut = () => {
+    setUserProfile(null);
+    try {
+      localStorage.removeItem('luxue_user_profile');
+    } catch {}
+  };
+
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeSearchInput, setActiveSearchInput] = useState<string>('');
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<string>('All');
@@ -168,7 +204,23 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const saveAddressForFuture = (address: ShippingAddress) => {
     setSavedAddress(address);
-    localStorage.setItem('luxue_saved_address', JSON.stringify(address));
+    try {
+      localStorage.setItem('luxue_saved_address', JSON.stringify(address));
+    } catch {}
+
+    setUserProfile(prev => {
+      if (!prev) return prev;
+      const formatted = `${address.house}, ${address.street}${address.area ? `, ${address.area}` : ''}, ${address.city}, ${address.state} - ${address.pin}`;
+      const updated: UserProfile = {
+        ...prev,
+        shippingAddress: formatted,
+        addressDetails: address,
+      };
+      try {
+        localStorage.setItem('luxue_user_profile', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
   };
 
   // Sync to local storage
@@ -186,16 +238,41 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Handle URL history state change for smooth SPA navigation & URL routing
   useEffect(() => {
-    const syncWithLocation = () => {
-      const path = window.location.pathname;
-      if (path.startsWith('/admin')) {
-        const adminView = path.substring(1) || 'admin';
-        setCurrentView(adminView);
-      } else if (path === '/' || path === '') {
-        setCurrentView('home');
-      } else {
-        const cleanView = path.replace(/^\//, '');
-        setCurrentView(cleanView || 'home');
+    const syncWithLocation = (event?: PopStateEvent) => {
+      try {
+        const state = event?.state;
+        const path = window.location.pathname;
+        const search = window.location.search;
+
+        if (state && state.view) {
+          setCurrentView(state.view);
+          if (state.productId) {
+            setSelectedProductId(state.productId);
+          }
+          return;
+        }
+
+        if (path.startsWith('/admin')) {
+          const adminView = path.substring(1) || 'admin';
+          setCurrentView(adminView);
+        } else if (path === '/' || path === '') {
+          setCurrentView('home');
+        } else if (path.startsWith('/product/') || path.startsWith('/product-detail/')) {
+          const parts = path.split('/');
+          const prodId = parts[2];
+          setCurrentView('product-detail');
+          if (prodId) setSelectedProductId(decodeURIComponent(prodId));
+        } else if (path === '/product-detail' || path === '/product') {
+          const params = new URLSearchParams(search);
+          const prodId = params.get('id');
+          setCurrentView('product-detail');
+          if (prodId) setSelectedProductId(prodId);
+        } else {
+          const cleanView = path.replace(/^\//, '');
+          setCurrentView(cleanView || 'home');
+        }
+      } catch {
+        // Fallback
       }
     };
 
@@ -681,10 +758,13 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (productId) {
       setSelectedProductId(productId);
     }
-    const path = view.startsWith('/') ? view : `/${view === 'home' ? '' : view}`;
+    let path = view.startsWith('/') ? view : `/${view === 'home' ? '' : view}`;
+    if (view === 'product-detail' && productId) {
+      path = `/product/${encodeURIComponent(productId)}`;
+    }
     try {
       if (window.location.pathname !== path) {
-        window.history.pushState({}, '', path);
+        window.history.pushState({ view, productId }, '', path);
       }
     } catch {
       // Fallback for sandboxed iframe state
@@ -714,6 +794,9 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
         activeCategoryFilter,
         activeSearchInput,
         savedAddress,
+        userProfile,
+        signUp,
+        logOut,
         setSearchQuery,
         setActiveCategoryFilter,
         addToCart,

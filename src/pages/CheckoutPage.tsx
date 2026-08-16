@@ -14,6 +14,7 @@ export const CheckoutPage: React.FC = () => {
   const {
     cart,
     savedAddress,
+    userProfile,
     placeOrder,
     navigate,
     setLastCreatedOrder,
@@ -25,9 +26,9 @@ export const CheckoutPage: React.FC = () => {
       return savedAddress;
     }
     return {
-      fullName: '',
-      mobile: '',
-      email: '',
+      fullName: userProfile?.name || '',
+      mobile: userProfile?.mobile || '',
+      email: userProfile?.email || '',
       house: '',
       street: '',
       area: '',

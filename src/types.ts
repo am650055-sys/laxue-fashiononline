@@ -199,6 +199,16 @@ export interface PaymentGatewaySettings {
   testModeEnabled?: boolean;
 }
 
+export interface UserProfile {
+  name: string;
+  mobile: string;
+  email: string;
+  isVip?: boolean;
+  createdAt?: string;
+  shippingAddress?: string;
+  addressDetails?: ShippingAddress;
+}
+
 export interface StoreSettings {
   whatsappNumber: string;
   supportPhone: string;

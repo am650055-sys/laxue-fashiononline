@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   ArrowLeft,
   Star,
-  Heart,
   ShoppingBag,
   Zap,
   Truck,
@@ -10,42 +9,131 @@ import {
   RefreshCw,
   ChevronDown,
   ChevronUp,
-  Gift,
   Plus,
   Minus,
   AlertCircle,
+  Check,
+  Share2,
+  Lock,
+  Sparkles,
 } from 'lucide-react';
 import { useShop } from '../context/ShopContext';
-import { Size } from '../types';
-import { ProductCard } from '../components/ProductCard';
+import { Product, Size } from '../types';
+import { ProductImageGallery } from '../components/product/ProductImageGallery';
+import { ProductRecommendations } from '../components/product/ProductRecommendations';
+import { RecentlyViewedSection } from '../components/product/RecentlyViewedSection';
+import { ProductDetailSkeleton } from '../components/product/ProductDetailSkeleton';
+import { getRecommendedProducts, getTrendingAlternates } from '../utils/recommendationEngine';
+import { addToRecentlyViewed, getRecentlyViewedProductIds } from '../utils/recentHistory';
 
 export const ProductDetailPage: React.FC = () => {
-  const { products, selectedProductId, navigate, addToCart, isWishlisted, toggleWishlist } = useShop();
+  const {
+    products,
+    selectedProductId,
+    navigate,
+    addToCart,
+  } = useShop();
 
-  const product = products.find(p => p.id === selectedProductId || p.slug === selectedProductId) || products[0];
+  // Find active product
+  const product: Product = useMemo(() => {
+    if (!products || products.length === 0) {
+      return {} as Product;
+    }
+    const found = products.find(
+      p => p.id === selectedProductId || (p.slug && p.slug === selectedProductId)
+    );
+    return found || products[0];
+  }, [products, selectedProductId]);
 
+  // Page interactive state
   const [selectedSize, setSelectedSize] = useState<Size | null>(null);
-  const [selectedColor, setSelectedColor] = useState<string>(product?.colors?.[0] || 'Maroon / Wine');
+  const [selectedColor, setSelectedColor] = useState<string>('');
   const [quantity, setQuantity] = useState<number>(1);
   const [activeImageIdx, setActiveImageIdx] = useState<number>(0);
   const [sizeError, setSizeError] = useState<string | null>(null);
+  const [addedAnimation, setAddedAnimation] = useState<boolean>(false);
+  const [isProductTransitioning, setIsProductTransitioning] = useState<boolean>(false);
+  const [shareSuccess, setShareSuccess] = useState<boolean>(false);
 
+  // Delivery checker state
   const [pincode, setPincode] = useState<string>('');
-  const [pincodeStatus, setPincodeStatus] = useState<string | null>(null);
+  const [pincodeStatus, setPincodeStatus] = useState<{ message: string; success: boolean } | null>(null);
 
-  // Accordion states
+  // Accordion open/close states
   const [openAccordions, setOpenAccordions] = useState<{ [key: string]: boolean }>({
     description: true,
+    highlights: true,
     details: true,
-    fabric: false,
     shipping: false,
     returns: false,
     sizeGuide: false,
   });
 
-  if (!product) return null;
+  // Recently viewed products state
+  const [recentProductIds, setRecentProductIds] = useState<string[]>([]);
 
-  const isLiked = isWishlisted(product.id);
+  // Top page container ref for smooth auto-scroll on product change
+  const topContainerRef = useRef<HTMLDivElement>(null);
+
+  // Track product view and update recently viewed list
+  useEffect(() => {
+    if (product && product.id) {
+      addToRecentlyViewed(product.id);
+      setRecentProductIds(getRecentlyViewedProductIds(product.id));
+      setSelectedSize(null);
+      setSelectedColor(product.colors?.[0] || 'Original');
+      setQuantity(1);
+      setActiveImageIdx(0);
+      setSizeError(null);
+    }
+  }, [product?.id]);
+
+  // Calculate dynamic recommendations for this specific product
+  const similarProducts = useMemo(() => {
+    if (!product || !product.id) return [];
+    return getRecommendedProducts(product, products, 10);
+  }, [product, products]);
+
+  // Trending alternates if similar is low
+  const trendingAlternates = useMemo(() => {
+    if (!product || !product.id) return [];
+    return getTrendingAlternates(product, products, 8);
+  }, [product, products]);
+
+  // Resolve recently viewed product items
+  const recentlyViewedProducts = useMemo(() => {
+    if (!recentProductIds || recentProductIds.length === 0) return [];
+    return recentProductIds
+      .map(id => products.find(p => p.id === id))
+      .filter((p): p is Product => Boolean(p && p.id !== product.id));
+  }, [recentProductIds, products, product?.id]);
+
+  // Handler to smoothly transition to a new recommended or recently viewed product
+  const handleSelectProduct = (newProduct: Product) => {
+    if (!newProduct || newProduct.id === product.id) return;
+
+    setIsProductTransitioning(true);
+
+    // Save previous product into recent history
+    if (product?.id) {
+      addToRecentlyViewed(product.id);
+    }
+
+    // Scroll to top of product detail smoothly
+    if (topContainerRef.current) {
+      topContainerRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // Trigger navigate and reset local transition state with 250ms fluid delay
+    navigate('product-detail', newProduct.id);
+
+    setTimeout(() => {
+      setIsProductTransitioning(false);
+      setRecentProductIds(getRecentlyViewedProductIds(newProduct.id));
+    }, 280);
+  };
 
   const toggleAccordion = (key: string) => {
     setOpenAccordions(prev => ({ ...prev, [key]: !prev[key] }));
@@ -53,27 +141,43 @@ export const ProductDetailPage: React.FC = () => {
 
   const handlePincodeCheck = (e: React.FormEvent) => {
     e.preventDefault();
-    if (pincode.length === 6 && /^\d+$/.test(pincode)) {
-      setPincodeStatus(`Available for Delivery at ${pincode} by Express Courier in 3-4 Days.`);
+    if (pincode.length === 6 && /^\d{6}$/.test(pincode)) {
+      setPincodeStatus({
+        message: `Delivery available for ${pincode}! Free Express Courier delivery in 2-4 business days. Cash on Delivery is available.`,
+        success: true,
+      });
     } else {
-      setPincodeStatus('Please enter a valid 6-digit Indian PIN code.');
+      setPincodeStatus({
+        message: 'Please enter a valid 6-digit Indian Postal PIN code.',
+        success: false,
+      });
     }
   };
 
   const handleAddToCart = () => {
     if (!selectedSize) {
-      setSizeError('Please select your size');
+      setSizeError('Please select a size first');
+      const sizeElem = document.getElementById('size-selector-area');
+      if (sizeElem) {
+        sizeElem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
       return;
     }
     setSizeError(null);
     for (let i = 0; i < quantity; i++) {
       addToCart(product, selectedSize, selectedColor);
     }
+    setAddedAnimation(true);
+    setTimeout(() => setAddedAnimation(false), 2000);
   };
 
   const handleBuyNow = () => {
     if (!selectedSize) {
-      setSizeError('Please select your size');
+      setSizeError('Please select a size first');
+      const sizeElem = document.getElementById('size-selector-area');
+      if (sizeElem) {
+        sizeElem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
       return;
     }
     setSizeError(null);
@@ -83,86 +187,94 @@ export const ProductDetailPage: React.FC = () => {
     navigate('checkout');
   };
 
-  const images = product.gallery && product.gallery.length > 0 ? product.gallery : [product.image];
+  const handleShareProduct = async () => {
+    const url = window.location.href;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: product.name,
+          text: `Check out ${product.name} at LUXUE FASHION:`,
+          url: url,
+        });
+      } catch {
+        // User cancelled or unsupported
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(url);
+        setShareSuccess(true);
+        setTimeout(() => setShareSuccess(false), 2500);
+      } catch {}
+    }
+  };
 
-  // Related products (same category or top trending)
-  const relatedProducts = products
-    .filter(p => p.id !== product.id && (p.category === product.category || p.isFeatured))
-    .slice(0, 4);
+  if (!product || !product.id) {
+    return <ProductDetailSkeleton />;
+  }
+
+  if (isProductTransitioning) {
+    return <ProductDetailSkeleton />;
+  }
+
+  const availableSizes: Size[] =
+    product.sizes && product.sizes.length > 0 ? product.sizes : ['S', 'M', 'L', 'XL', 'XXL'];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24">
-      {/* Back Link */}
-      <button
-        onClick={() => navigate('shop')}
-        className="inline-flex items-center gap-2 text-xs font-bold text-[#4A0E17] hover:text-[#B8860B] mb-6 transition-colors cursor-pointer"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        <span>BACK TO SHOP</span>
-      </button>
+    <div
+      ref={topContainerRef}
+      className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 transition-opacity duration-300"
+    >
+      {/* Top Breadcrumb & Action Row */}
+      <div className="flex items-center justify-between gap-4 mb-6">
+        <button
+          type="button"
+          onClick={() => navigate('shop')}
+          className="inline-flex items-center gap-2 text-xs font-bold text-[#4A0E17] hover:text-[#B8860B] transition-colors cursor-pointer group"
+        >
+          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+          <span>BACK TO ALL KURTIS</span>
+        </button>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
-        {/* Gallery Column (lg:col-span-6) */}
-        <div className="lg:col-span-6 space-y-4">
-          {/* Main Large Image */}
-          <div className="relative aspect-[3/4] w-full rounded-2xl overflow-hidden bg-[#F7F4EE] border border-[#EAE3D2] shadow-md group">
-            <img
-              src={images[activeImageIdx]}
-              alt={product.name}
-              className="w-full h-full object-cover object-top transition-all duration-300"
-              referrerPolicy="no-referrer"
-            />
-
-            {/* Wishlist Heart */}
-            <button
-              onClick={() => toggleWishlist(product.id)}
-              className={`absolute top-4 right-4 p-3 rounded-full shadow-lg backdrop-blur-xs transition-all z-10 cursor-pointer ${
-                isLiked ? 'bg-[#4A0E17] text-rose-400 border border-[#D4AF37]' : 'bg-white/90 text-[#3D332A] hover:bg-white'
-              }`}
-              title="Add to Wishlist"
-            >
-              <Heart className={`w-5 h-5 ${isLiked ? 'fill-current text-rose-400' : ''}`} />
-            </button>
-
-            {product.isRakhiGiftEligible && (
-              <div className="absolute top-4 left-4 bg-emerald-900 text-emerald-100 text-xs font-bold px-3 py-1 rounded-full border border-emerald-400 flex items-center gap-1 shadow-md">
-                <Gift className="w-3.5 h-3.5 text-emerald-300" />
-                <span>RAKHI GIFT ELIGIBLE</span>
-              </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleShareProduct}
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-[#5A4D41] hover:text-[#4A0E17] bg-white border border-[#EAE3D2] hover:border-[#D4AF37] px-3 py-1.5 rounded-xl transition-all cursor-pointer shadow-xs"
+            title="Share this product"
+          >
+            {shareSuccess ? (
+              <>
+                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                <span className="text-emerald-600">Link Copied!</span>
+              </>
+            ) : (
+              <>
+                <Share2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Share</span>
+              </>
             )}
+          </button>
+        </div>
+      </div>
 
-            {/* Image counter for gallery */}
-            <div className="absolute bottom-4 right-4 bg-black/60 text-white text-[10px] font-bold px-2.5 py-1 rounded-full backdrop-blur-sm">
-              {activeImageIdx + 1} / {images.length}
-            </div>
-          </div>
-
-          {/* Swipeable Mobile / Desktop Thumbnails */}
-          {images.length > 1 && (
-            <div className="flex items-center gap-3 overflow-x-auto no-scrollbar pb-2 snap-x">
-              {images.map((img, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setActiveImageIdx(idx)}
-                  className={`w-20 h-24 shrink-0 rounded-xl overflow-hidden border-2 transition-all cursor-pointer snap-start ${
-                    activeImageIdx === idx
-                      ? 'border-[#4A0E17] scale-105 shadow-md'
-                      : 'border-[#EAE3D2] opacity-70 hover:opacity-100'
-                  }`}
-                >
-                  <img src={img} alt={`View ${idx + 1}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                </button>
-              ))}
-            </div>
-          )}
+      {/* Main Product Layout (2 Columns on Desktop) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
+        {/* Left Column: Product Gallery */}
+        <div className="lg:col-span-6">
+          <ProductImageGallery
+            product={product}
+            activeImageIdx={activeImageIdx}
+            setActiveImageIdx={setActiveImageIdx}
+          />
         </div>
 
-        {/* Product Info Column (lg:col-span-6) */}
+        {/* Right Column: Product Info, Pricing, Sizes & Checkout */}
         <div className="lg:col-span-6 space-y-6">
+          {/* Header info */}
           <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#801723]">
-                {product.category}
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#801723] bg-[#FAF3E0] px-2.5 py-0.5 rounded-md border border-[#D4AF37]/30">
+                {product.category || 'Kurti'}
               </span>
               {product.subcategory && (
                 <>
@@ -174,40 +286,50 @@ export const ProductDetailPage: React.FC = () => {
               )}
             </div>
 
-            <h1 className="font-serif-luxury text-2xl sm:text-3xl lg:text-4xl font-bold text-[#3B0C13] leading-snug mt-1">
+            <h1 className="font-serif-luxury text-2xl sm:text-3xl lg:text-4xl font-bold text-[#3B0C13] leading-snug">
               {product.name}
             </h1>
 
-            {/* Rating & SKU */}
-            <div className="flex items-center gap-3 mt-2">
-              <div className="flex items-center gap-1 bg-[#FAF6EE] px-2.5 py-1 rounded-md border border-[#E8D8B8] text-xs font-bold text-[#3B0C13]">
-                <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
-                <span>{product.rating}</span>
-                <span className="text-[#8C7A6B]">({product.reviewsCount} reviews)</span>
+            {/* Rating, Reviews and SKU */}
+            <div className="flex flex-wrap items-center gap-3 mt-2.5">
+              <div className="flex items-center gap-1.5 bg-[#FAF6EE] px-2.5 py-1 rounded-lg border border-[#E8D8B8] text-xs font-bold text-[#3B0C13]">
+                <Star className="w-4 h-4 fill-amber-400 text-amber-500" />
+                <span>{product.rating || 4.9}</span>
+                <span className="text-[#8C7A6B] font-normal">
+                  ({product.reviewsCount || 48} verified ratings)
+                </span>
               </div>
-              <span className="text-xs text-[#8C7A6B]">SKU: {product.sku}</span>
+              <span className="text-xs text-[#8C7A6B]">SKU: {product.sku || 'LUX-KURTI'}</span>
+              {product.stock && product.stock <= 10 && (
+                <span className="text-[11px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 animate-pulse">
+                  ⚡ Only {product.stock} items left in stock
+                </span>
+              )}
             </div>
           </div>
 
-          {/* Pricing Box */}
-          <div className="p-4 bg-[#FAF6EE] rounded-2xl border border-[#EAE3D2]">
-            <div className="flex items-baseline gap-3">
-              <span className="text-2xl sm:text-3xl font-black text-[#4A0E17]">
+          {/* Pricing Box (₹699 Special) */}
+          <div className="p-4 sm:p-5 bg-gradient-to-br from-[#FAF6EE] to-[#FFFDF9] rounded-2xl border border-[#EAE3D2] shadow-xs">
+            <div className="flex items-baseline flex-wrap gap-3">
+              <span className="text-3xl sm:text-4xl font-black text-[#4A0E17]">
                 ₹{product.price.toLocaleString('en-IN')}
               </span>
               {product.originalPrice > product.price && (
-                <span className="text-base text-[#9E8E81] line-through font-normal">
+                <span className="text-lg text-[#9E8E81] line-through font-normal">
                   ₹{product.originalPrice.toLocaleString('en-IN')}
                 </span>
               )}
               {product.discountPercent > 0 && (
-                <span className="bg-[#801723] text-white text-xs font-bold px-2.5 py-0.5 rounded-full">
+                <span className="bg-[#801723] text-white text-xs font-bold px-3 py-1 rounded-full shadow-xs">
                   SAVE {product.discountPercent}%
                 </span>
               )}
             </div>
-            <p className="text-[11px] text-[#7A695C] mt-1">
-              Inclusive of all taxes • Free Express Shipping across India
+            <p className="text-xs text-[#7A695C] mt-2 flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-[#D4AF37]" />
+              <span>
+                Inclusive of all GST taxes • <strong>Free Express Shipping</strong> across India
+              </span>
             </p>
           </div>
 
@@ -220,37 +342,40 @@ export const ProductDetailPage: React.FC = () => {
           )}
 
           {/* Size Selector */}
-          <div>
+          <div id="size-selector-area">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold uppercase tracking-wider text-[#3D332A]">
                 SELECT SIZE:{' '}
                 {selectedSize ? (
-                  <span className="text-[#4A0E17] font-extrabold">{selectedSize}</span>
+                  <span className="text-[#4A0E17] font-black text-sm">{selectedSize}</span>
                 ) : (
-                  <span className="text-red-600 font-extrabold">* Required</span>
+                  <span className="text-red-600 font-extrabold text-xs">* Select a size</span>
                 )}
               </span>
               <button
+                type="button"
                 onClick={() => toggleAccordion('sizeGuide')}
-                className="text-xs font-bold text-[#801723] underline underline-offset-2 cursor-pointer"
+                className="text-xs font-bold text-[#801723] hover:text-[#B8860B] underline underline-offset-2 cursor-pointer"
               >
-                Size Guide
+                Size Chart (Inches)
               </button>
             </div>
+
             <div className="flex flex-wrap gap-2.5">
-              {product.sizes.map(sz => {
+              {availableSizes.map(sz => {
                 const isSelected = selectedSize === sz;
                 return (
                   <button
                     key={sz}
+                    type="button"
                     onClick={() => {
                       setSelectedSize(sz);
                       setSizeError(null);
                     }}
-                    className={`w-12 h-12 rounded-xl text-xs font-extrabold border transition-all cursor-pointer ${
+                    className={`w-12 h-12 rounded-xl text-xs font-extrabold border transition-all cursor-pointer flex items-center justify-center ${
                       isSelected
-                        ? 'bg-[#4A0E17] text-[#DFBA67] border-[#D4AF37] shadow-md scale-105'
-                        : 'bg-white text-[#3D332A] border-[#EAE3D2] hover:border-[#D4AF37]'
+                        ? 'bg-[#4A0E17] text-[#DFBA67] border-[#D4AF37] shadow-md scale-105 ring-2 ring-[#DFBA67]/50'
+                        : 'bg-white text-[#3D332A] border-[#EAE3D2] hover:border-[#D4AF37] hover:bg-[#FAF6EE]'
                     }`}
                   >
                     {sz}
@@ -267,8 +392,10 @@ export const ProductDetailPage: React.FC = () => {
             </span>
             <div className="inline-flex items-center bg-white border border-[#EAE3D2] rounded-xl p-1 shadow-xs">
               <button
+                type="button"
                 onClick={() => setQuantity(q => Math.max(1, q - 1))}
                 className="w-9 h-9 flex items-center justify-center text-[#4A0E17] hover:bg-[#FAF6EE] rounded-lg cursor-pointer"
+                aria-label="Decrease quantity"
               >
                 <Minus className="w-4 h-4" />
               </button>
@@ -276,8 +403,10 @@ export const ProductDetailPage: React.FC = () => {
                 {quantity}
               </span>
               <button
-                onClick={() => setQuantity(q => Math.min(product.stock, q + 1))}
+                type="button"
+                onClick={() => setQuantity(q => Math.min(product.stock || 50, q + 1))}
                 className="w-9 h-9 flex items-center justify-center text-[#4A0E17] hover:bg-[#FAF6EE] rounded-lg cursor-pointer"
+                aria-label="Increase quantity"
               >
                 <Plus className="w-4 h-4" />
               </button>
@@ -287,20 +416,51 @@ export const ProductDetailPage: React.FC = () => {
           {/* Action Buttons: Add to Cart & Buy Now */}
           <div className="flex flex-col sm:flex-row gap-3 pt-2">
             <button
+              type="button"
               onClick={handleAddToCart}
-              className="flex-1 bg-[#FAF6EE] hover:bg-[#FAF0DC] text-[#4A0E17] font-bold text-sm py-4 px-6 rounded-2xl border-2 border-[#4A0E17] shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+              className={`flex-1 font-bold text-sm py-4 px-6 rounded-2xl border-2 shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 ${
+                addedAnimation
+                  ? 'bg-emerald-700 text-white border-emerald-700'
+                  : 'bg-[#FAF6EE] hover:bg-[#FAF0DC] text-[#4A0E17] border-[#4A0E17]'
+              }`}
             >
-              <ShoppingBag className="w-5 h-5 text-[#801723]" />
-              <span>ADD TO CART</span>
+              {addedAnimation ? (
+                <>
+                  <Check className="w-5 h-5" />
+                  <span>ADDED TO CART!</span>
+                </>
+              ) : (
+                <>
+                  <ShoppingBag className="w-5 h-5 text-[#801723]" />
+                  <span>ADD TO CART</span>
+                </>
+              )}
             </button>
 
             <button
+              type="button"
               onClick={handleBuyNow}
               className="flex-1 bg-[#4A0E17] hover:bg-[#62121E] text-[#DFBA67] font-bold text-sm py-4 px-6 rounded-2xl border-2 border-[#D4AF37] shadow-xl hover:scale-[1.02] transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
             >
-              <Zap className="w-5 h-5 text-[#DFBA67]" />
+              <Zap className="w-5 h-5 text-[#DFBA67] fill-current" />
               <span>BUY NOW</span>
             </button>
+          </div>
+
+          {/* Trust Guarantees Row */}
+          <div className="grid grid-cols-3 gap-2 py-3 px-3 bg-[#FAF6EE]/80 rounded-xl border border-[#EAE3D2] text-[11px] text-[#5A4D41]">
+            <div className="flex items-center gap-1.5 justify-center text-center">
+              <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0" />
+              <span className="font-semibold">100% Genuine</span>
+            </div>
+            <div className="flex items-center gap-1.5 justify-center text-center border-x border-[#EAE3D2]">
+              <RefreshCw className="w-4 h-4 text-[#801723] shrink-0" />
+              <span className="font-semibold">7-Day Return</span>
+            </div>
+            <div className="flex items-center gap-1.5 justify-center text-center">
+              <Lock className="w-4 h-4 text-[#B8860B] shrink-0" />
+              <span className="font-semibold">Verified UPI</span>
+            </div>
           </div>
 
           {/* Pincode Delivery Checker */}
@@ -311,55 +471,71 @@ export const ProductDetailPage: React.FC = () => {
             <form onSubmit={handlePincodeCheck} className="flex gap-2">
               <input
                 type="text"
-                placeholder="Enter 6-digit Pincode"
+                placeholder="Enter 6-digit PIN code (e.g. 110001)"
                 maxLength={6}
                 value={pincode}
                 onChange={e => setPincode(e.target.value)}
-                className="flex-1 bg-[#FAF6EE] text-xs px-3 py-2 rounded-xl border border-[#D4AF37]/40 focus:outline-none"
+                className="flex-1 bg-[#FAF6EE] text-xs px-3.5 py-2.5 rounded-xl border border-[#D4AF37]/40 focus:outline-none focus:ring-1 focus:ring-[#4A0E17]"
               />
               <button
                 type="submit"
-                className="bg-[#4A0E17] text-[#DFBA67] text-xs font-bold px-4 py-2 rounded-xl border border-[#D4AF37] cursor-pointer"
+                className="bg-[#4A0E17] text-[#DFBA67] text-xs font-bold px-4 py-2.5 rounded-xl border border-[#D4AF37] hover:bg-[#62121E] transition-colors cursor-pointer"
               >
                 CHECK
               </button>
             </form>
             {pincodeStatus && (
-              <p className="text-xs font-semibold text-emerald-800 mt-2 bg-emerald-50 p-2 rounded border border-emerald-200">
-                {pincodeStatus}
+              <p
+                className={`text-xs font-semibold mt-2.5 p-2.5 rounded-xl border ${
+                  pincodeStatus.success
+                    ? 'text-emerald-900 bg-emerald-50 border-emerald-200'
+                    : 'text-red-900 bg-red-50 border-red-200'
+                }`}
+              >
+                {pincodeStatus.message}
               </p>
             )}
           </div>
 
-          {/* Expandable Information Accordions */}
+          {/* Expandable Specifications & Information Accordions */}
           <div className="space-y-3 pt-4 border-t border-[#EAE3D2]">
-            {/* Description */}
+            {/* 1. Description */}
             <div className="border border-[#EAE3D2] rounded-xl overflow-hidden bg-white">
               <button
+                type="button"
                 onClick={() => toggleAccordion('description')}
                 className="w-full p-4 text-left font-bold text-xs uppercase tracking-wider text-[#3B0C13] flex items-center justify-between cursor-pointer"
               >
                 <span>PRODUCT DESCRIPTION</span>
-                {openAccordions.description ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                {openAccordions.description ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                )}
               </button>
               {openAccordions.description && (
                 <div className="p-4 pt-0 text-xs text-[#5A4D41] leading-relaxed border-t border-[#EAE3D2]/50 whitespace-pre-line">
-                  {product.description}
+                  {product.description || product.shortDescription}
                 </div>
               )}
             </div>
 
-            {/* Product Highlights */}
+            {/* 2. Key Highlights */}
             {product.highlights && product.highlights.length > 0 && (
               <div className="border border-[#EAE3D2] rounded-xl overflow-hidden bg-white">
                 <button
+                  type="button"
                   onClick={() => toggleAccordion('highlights')}
                   className="w-full p-4 text-left font-bold text-xs uppercase tracking-wider text-[#3B0C13] flex items-center justify-between cursor-pointer"
                 >
                   <span>KEY HIGHLIGHTS</span>
-                  {openAccordions.highlights !== false ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  {openAccordions.highlights ? (
+                    <ChevronUp className="w-4 h-4" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4" />
+                  )}
                 </button>
-                {openAccordions.highlights !== false && (
+                {openAccordions.highlights && (
                   <div className="p-4 pt-0 text-xs text-[#5A4D41] leading-relaxed border-t border-[#EAE3D2]/50 space-y-1.5">
                     {product.highlights.map((h, i) => (
                       <div key={i} className="flex items-start gap-2">
@@ -372,103 +548,153 @@ export const ProductDetailPage: React.FC = () => {
               </div>
             )}
 
-            {/* Product Details Specs */}
+            {/* 3. Product Specifications */}
             <div className="border border-[#EAE3D2] rounded-xl overflow-hidden bg-white">
               <button
+                type="button"
                 onClick={() => toggleAccordion('details')}
                 className="w-full p-4 text-left font-bold text-xs uppercase tracking-wider text-[#3B0C13] flex items-center justify-between cursor-pointer"
               >
                 <span>PRODUCT SPECIFICATIONS</span>
-                {openAccordions.details ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                {openAccordions.details ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                )}
               </button>
               {openAccordions.details && (
-                <div className="p-4 pt-0 text-xs text-[#5A4D41] leading-relaxed border-t border-[#EAE3D2]/50 space-y-1">
-                  <p>• <strong>Product Type / Style:</strong> {product.style || product.category || 'Ethnic Wear'}</p>
-                  <p>• <strong>Color:</strong> {product.color || product.colors?.join(', ') || 'Multicolor'}</p>
-                  <p>• <strong>Pattern:</strong> {product.pattern || 'Solid / Designer Detailing'}</p>
-                  <p>• <strong>Neckline:</strong> {product.neck || 'V-Neck / Round Neck'}</p>
-                  <p>• <strong>Sleeve:</strong> {product.sleeves || 'Full Sleeves'}</p>
+                <div className="p-4 pt-0 text-xs text-[#5A4D41] leading-relaxed border-t border-[#EAE3D2]/50 space-y-1.5">
+                  <p>
+                    • <strong>Category & Style:</strong>{' '}
+                    {product.style || product.subcategory || product.category || 'Ethnic Kurti'}
+                  </p>
+                  <p>
+                    • <strong>Color:</strong>{' '}
+                    {product.color || product.colors?.join(', ') || 'Multicolor'}
+                  </p>
+                  <p>
+                    • <strong>Pattern / Print:</strong>{' '}
+                    {product.pattern || 'Designer Print / Handcrafted Detailing'}
+                  </p>
+                  <p>
+                    • <strong>Neckline:</strong>{' '}
+                    {product.neck || 'Mandarin Collar / Round Notch Neck'}
+                  </p>
+                  <p>
+                    • <strong>Sleeve Type:</strong>{' '}
+                    {product.sleeves || '3/4th Sleeves with Border Accent'}
+                  </p>
                   {product.setIncludes && (
-                    <p>• <strong>Set Includes:</strong> {product.setIncludes}</p>
+                    <p>
+                      • <strong>Set Includes:</strong> {product.setIncludes}
+                    </p>
                   )}
-                  <p>• <strong>Fit:</strong> {product.fit || 'Regular / Flared'}</p>
-                  <p>• <strong>Fabric:</strong> {product.fabric || 'Premium Fabric'}</p>
-                  <p>• <strong>Occasion:</strong> {product.occasion || 'Festive, Party & Wedding Wear'}</p>
+                  <p>
+                    • <strong>Fit:</strong> {product.fit || 'Regular Straight Fit'}
+                  </p>
+                  <p>
+                    • <strong>Fabric Composition:</strong>{' '}
+                    {product.fabric || '100% Breathable Pure Cotton'}
+                  </p>
+                  <p>
+                    • <strong>Occasion:</strong>{' '}
+                    {product.occasion || 'Office, College, Casual Outings & Festive Gatherings'}
+                  </p>
                 </div>
               )}
             </div>
 
-            {/* Shipping Info */}
+            {/* 4. Shipping Info */}
             <div className="border border-[#EAE3D2] rounded-xl overflow-hidden bg-white">
               <button
+                type="button"
                 onClick={() => toggleAccordion('shipping')}
                 className="w-full p-4 text-left font-bold text-xs uppercase tracking-wider text-[#3B0C13] flex items-center justify-between cursor-pointer"
               >
                 <div className="flex items-center gap-2">
                   <Truck className="w-4 h-4 text-[#801723]" />
-                  <span>SHIPPING INFORMATION</span>
+                  <span>DELIVERY & SHIPPING INFORMATION</span>
                 </div>
-                {openAccordions.shipping ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                {openAccordions.shipping ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                )}
               </button>
               {openAccordions.shipping && (
-                <div className="p-4 pt-0 text-xs text-[#5A4D41] leading-relaxed border-t border-[#EAE3D2]/50 space-y-1">
-                  <p>• Express shipping dispatched within 24 hours.</p>
-                  <p>• Delivery across Metro cities in 2-4 business days.</p>
-                  <p>• Cash on Delivery (COD) available nationwide.</p>
+                <div className="p-4 pt-0 text-xs text-[#5A4D41] leading-relaxed border-t border-[#EAE3D2]/50 space-y-1.5">
+                  <p>• <strong>Dispatched within 24 Hours:</strong> Every order is carefully hand-inspected and packed in high-grade protective packaging.</p>
+                  <p>• <strong>Transit Duration:</strong> Metro cities arrive in 2-3 business days; Rest of India within 3-5 business days.</p>
+                  <p>• <strong>Free Shipping:</strong> Free express doorstep delivery across all Indian pin codes.</p>
                 </div>
               )}
             </div>
 
-            {/* Return Information */}
+            {/* 5. Return & Exchange Policy */}
             <div className="border border-[#EAE3D2] rounded-xl overflow-hidden bg-white">
               <button
+                type="button"
                 onClick={() => toggleAccordion('returns')}
                 className="w-full p-4 text-left font-bold text-xs uppercase tracking-wider text-[#3B0C13] flex items-center justify-between cursor-pointer"
               >
                 <div className="flex items-center gap-2">
                   <RefreshCw className="w-4 h-4 text-[#801723]" />
-                  <span>RETURNS & EXCHANGE POLICY</span>
+                  <span>7-DAY EASY RETURN & EXCHANGE</span>
                 </div>
-                {openAccordions.returns ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                {openAccordions.returns ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                )}
               </button>
               {openAccordions.returns && (
-                <div className="p-4 pt-0 text-xs text-[#5A4D41] leading-relaxed border-t border-[#EAE3D2]/50 space-y-1">
-                  <p>• 7-day hassle-free return and exchange policy.</p>
-                  <p>• Pickup arranged right from your doorstep.</p>
-                  <p>• Tags and original packaging must be intact.</p>
+                <div className="p-4 pt-0 text-xs text-[#5A4D41] leading-relaxed border-t border-[#EAE3D2]/50 space-y-1.5">
+                  <p>• Hassle-free 7-day doorstep exchange for size or design changes.</p>
+                  <p>• Reverse pickup arranged straight from your location.</p>
+                  <p>• Item must be unused, unwashed with original brand tags attached.</p>
                 </div>
               )}
             </div>
 
-            {/* Size Guide */}
+            {/* 6. Size Guide Table */}
             <div className="border border-[#EAE3D2] rounded-xl overflow-hidden bg-white">
               <button
+                type="button"
                 onClick={() => toggleAccordion('sizeGuide')}
                 className="w-full p-4 text-left font-bold text-xs uppercase tracking-wider text-[#3B0C13] flex items-center justify-between cursor-pointer"
               >
-                <span>KURTI SIZE GUIDE (INCHES)</span>
-                {openAccordions.sizeGuide ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                <span>KURTI SIZE CHART (INCHES)</span>
+                {openAccordions.sizeGuide ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                )}
               </button>
               {openAccordions.sizeGuide && (
                 <div className="p-4 pt-0 text-xs text-[#5A4D41] border-t border-[#EAE3D2]/50 overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
+                  <table className="w-full text-left border-collapse mt-2">
                     <thead>
                       <tr className="bg-[#FAF6EE] border-b border-[#EAE3D2]">
-                        <th className="p-2">Size</th>
-                        <th className="p-2">Bust</th>
-                        <th className="p-2">Waist</th>
-                        <th className="p-2">Length</th>
+                        <th className="p-2.5 font-bold text-[#3B0C13]">Size</th>
+                        <th className="p-2.5 font-bold text-[#3B0C13]">Bust (in)</th>
+                        <th className="p-2.5 font-bold text-[#3B0C13]">Waist (in)</th>
+                        <th className="p-2.5 font-bold text-[#3B0C13]">Hip (in)</th>
+                        <th className="p-2.5 font-bold text-[#3B0C13]">Length (in)</th>
                       </tr>
                     </thead>
                     <tbody>
-                      <tr className="border-b border-[#EAE3D2]/50"><td className="p-2 font-bold">S</td><td className="p-2">36"</td><td className="p-2">32"</td><td className="p-2">44"</td></tr>
-                      <tr className="border-b border-[#EAE3D2]/50"><td className="p-2 font-bold">M</td><td className="p-2">38"</td><td className="p-2">34"</td><td className="p-2">44"</td></tr>
-                      <tr className="border-b border-[#EAE3D2]/50"><td className="p-2 font-bold">L</td><td className="p-2">40"</td><td className="p-2">36"</td><td className="p-2">45"</td></tr>
-                      <tr className="border-b border-[#EAE3D2]/50"><td className="p-2 font-bold">XL</td><td className="p-2">42"</td><td className="p-2">38"</td><td className="p-2">45"</td></tr>
-                      <tr className="border-b border-[#EAE3D2]/50"><td className="p-2 font-bold">XXL</td><td className="p-2">44"</td><td className="p-2">40"</td><td className="p-2">46"</td></tr>
-                      <tr><td className="p-2 font-bold">3XL</td><td className="p-2">46"</td><td className="p-2">42"</td><td className="p-2">46"</td></tr>
+                      <tr className="border-b border-[#EAE3D2]/50"><td className="p-2.5 font-bold">XS</td><td className="p-2.5">34"</td><td className="p-2.5">30"</td><td className="p-2.5">36"</td><td className="p-2.5">44"</td></tr>
+                      <tr className="border-b border-[#EAE3D2]/50"><td className="p-2.5 font-bold">S</td><td className="p-2.5">36"</td><td className="p-2.5">32"</td><td className="p-2.5">38"</td><td className="p-2.5">44"</td></tr>
+                      <tr className="border-b border-[#EAE3D2]/50"><td className="p-2.5 font-bold">M</td><td className="p-2.5">38"</td><td className="p-2.5">34"</td><td className="p-2.5">40"</td><td className="p-2.5">44"</td></tr>
+                      <tr className="border-b border-[#EAE3D2]/50"><td className="p-2.5 font-bold">L</td><td className="p-2.5">40"</td><td className="p-2.5">36"</td><td className="p-2.5">42"</td><td className="p-2.5">45"</td></tr>
+                      <tr className="border-b border-[#EAE3D2]/50"><td className="p-2.5 font-bold">XL</td><td className="p-2.5">42"</td><td className="p-2.5">38"</td><td className="p-2.5">44"</td><td className="p-2.5">45"</td></tr>
+                      <tr className="border-b border-[#EAE3D2]/50"><td className="p-2.5 font-bold">XXL</td><td className="p-2.5">44"</td><td className="p-2.5">40"</td><td className="p-2.5">46"</td><td className="p-2.5">46"</td></tr>
+                      <tr><td className="p-2.5 font-bold">3XL</td><td className="p-2.5">46"</td><td className="p-2.5">42"</td><td className="p-2.5">48"</td><td className="p-2.5">46"</td></tr>
                     </tbody>
                   </table>
+                  <p className="text-[11px] text-[#8C7A6B] mt-2 italic">
+                    Tip: If you fall between sizes, we recommend ordering one size up for a relaxed fit.
+                  </p>
                 </div>
               )}
             </div>
@@ -476,18 +702,35 @@ export const ProductDetailPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Related Products Section */}
-      {relatedProducts.length > 0 && (
-        <div className="mt-16 pt-10 border-t border-[#EAE3D2]">
-          <h2 className="font-serif-luxury text-2xl font-bold text-[#3B0C13] mb-6">
-            YOU MAY ALSO LIKE
-          </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
-            {relatedProducts.map(p => (
-              <ProductCard key={p.id} product={p} />
-            ))}
-          </div>
-        </div>
+      {/* Dynamic Recommendation Section 1: Similar Products for THIS specific product */}
+      {similarProducts.length > 0 && (
+        <ProductRecommendations
+          currentProduct={product}
+          recommendedProducts={similarProducts}
+          onSelectProduct={handleSelectProduct}
+          title="Similar Products"
+          subtitle={`Styles curated to match ${product.subcategory || product.category || 'Kurti'} designs and shades`}
+        />
+      )}
+
+      {/* Dynamic Recommendation Section 2: Trending Alternates / You May Also Like */}
+      {trendingAlternates.length > 0 && (
+        <ProductRecommendations
+          currentProduct={product}
+          recommendedProducts={trendingAlternates.filter(p => !similarProducts.slice(0, 4).some(sp => sp.id === p.id))}
+          onSelectProduct={handleSelectProduct}
+          title="You May Also Like"
+          subtitle="Top trending bestselling festive kurtis loved by customers"
+        />
+      )}
+
+      {/* Recently Viewed Browsing History Section */}
+      {recentlyViewedProducts.length > 0 && (
+        <RecentlyViewedSection
+          products={recentlyViewedProducts}
+          onSelectProduct={handleSelectProduct}
+          onClearHistory={() => setRecentProductIds([])}
+        />
       )}
     </div>
   );

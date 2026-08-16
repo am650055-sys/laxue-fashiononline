@@ -19,6 +19,7 @@ export const Header: React.FC = () => {
     products,
     categories,
     setActiveCategoryFilter,
+    userProfile,
   } = useShop();
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -142,10 +143,18 @@ export const Header: React.FC = () => {
           {/* Account Button (Desktop) */}
           <button
             onClick={() => navigate('profile')}
-            className="hidden md:block p-2 text-[#2D2622] hover:text-[#B8860B] transition-colors cursor-pointer"
-            title="My Profile"
+            className="hidden md:flex items-center gap-1.5 p-1.5 rounded-full hover:bg-[#FAF3E0] text-[#2D2622] hover:text-[#5C0F1B] transition-colors cursor-pointer"
+            title={userProfile ? `Logged in as ${userProfile.name}` : 'My Profile / Sign Up'}
           >
-            <User className="w-5 h-5" />
+            {userProfile ? (
+              <div className="w-7 h-7 rounded-full bg-[#5C0F1B] text-[#DFBA67] border border-[#D4AF37] flex items-center justify-center text-xs font-bold shadow-xs">
+                {userProfile.name.trim().split(/\s+/).length > 1
+                  ? (userProfile.name.trim().split(/\s+/)[0][0] + userProfile.name.trim().split(/\s+/).slice(-1)[0][0]).toUpperCase()
+                  : userProfile.name.trim().substring(0, 2).toUpperCase()}
+              </div>
+            ) : (
+              <User className="w-5 h-5" />
+            )}
           </button>
 
           {/* Cart Button */}
