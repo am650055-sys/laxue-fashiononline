@@ -1,6 +1,7 @@
 import React from 'react';
 import { QrCode, CreditCard, Lock, ArrowLeft, ShieldCheck, Zap } from 'lucide-react';
 import { PaymentMethod } from '../../types';
+import { PhonePeIcon, GPayIcon, PaytmIcon, BhimUpiIcon, OtherUpiCollageIcon } from './UpiBrandIcons';
 
 interface PaymentMethodStepProps {
   selectedMethod: PaymentMethod;
@@ -69,6 +70,13 @@ export const PaymentMethodStep: React.FC<PaymentMethodStepProps> = ({
                 <p className="text-[11px] text-[#7A695C] mt-0.5">
                   Direct Pay with PhonePe, Google Pay, Paytm, BHIM or Scan Dynamic QR
                 </p>
+                <div className="flex items-center gap-1.5 mt-2.5">
+                  <PhonePeIcon size={24} />
+                  <GPayIcon size={24} />
+                  <PaytmIcon size={24} />
+                  <BhimUpiIcon size={24} />
+                  <OtherUpiCollageIcon size={24} />
+                </div>
               </div>
             </div>
 

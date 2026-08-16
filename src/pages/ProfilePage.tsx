@@ -20,6 +20,7 @@ import {
   X,
   Home,
   Building,
+  Navigation,
 } from 'lucide-react';
 import { useShop } from '../context/ShopContext';
 import { ShippingAddress } from '../types';
@@ -95,8 +96,6 @@ export const ProfilePage: React.FC = () => {
   });
 
   const [addressErrors, setAddressErrors] = useState<{
-    fullName?: string;
-    mobile?: string;
     house?: string;
     street?: string;
     city?: string;
@@ -189,9 +188,9 @@ export const ProfilePage: React.FC = () => {
     setErrors({});
   };
 
-  // Open Address Modal with existing data or defaults
-  const handleOpenAddressModal = () => {
-    const current = savedAddress || userProfile?.addressDetails;
+  // Open Address Modal with completely fresh/blank inputs (or existing user-saved address on edit)
+  const handleOpenAddressModal = (isEditingExisting: boolean = false) => {
+    const current = (isEditingExisting ? (savedAddress || userProfile?.addressDetails) : null);
     if (current) {
       setAddressForm({
         fullName: current.fullName || userProfile?.name || '',
@@ -207,6 +206,7 @@ export const ProfilePage: React.FC = () => {
         saveForFuture: true,
       });
     } else {
+      // Completely blank inputs ready for manual entry
       setAddressForm({
         fullName: userProfile?.name || '',
         mobile: userProfile?.mobile || '',
@@ -228,8 +228,6 @@ export const ProfilePage: React.FC = () => {
   // Validate Address Form
   const validateAddressForm = (): boolean => {
     const errs: {
-      fullName?: string;
-      mobile?: string;
       house?: string;
       street?: string;
       city?: string;
@@ -237,21 +235,12 @@ export const ProfilePage: React.FC = () => {
       pin?: string;
     } = {};
 
-    if (!addressForm.fullName.trim()) {
-      errs.fullName = 'Full Name / Receiver Name is required';
-    }
-
-    const cleanMob = addressForm.mobile.replace(/\D/g, '');
-    if (!cleanMob || cleanMob.length !== 10) {
-      errs.mobile = 'Enter a valid 10-digit mobile number';
-    }
-
     if (!addressForm.house.trim()) {
-      errs.house = 'Flat / House No. / Building Name is required';
+      errs.house = 'House / Flat / Building No. is required';
     }
 
     if (!addressForm.street.trim()) {
-      errs.street = 'Street / Area / Locality is required';
+      errs.street = 'Street / Road / Area is required';
     }
 
     if (!addressForm.city.trim()) {
@@ -279,8 +268,8 @@ export const ProfilePage: React.FC = () => {
     setIsSavingAddress(true);
     setTimeout(() => {
       const formattedAddress: ShippingAddress = {
-        fullName: addressForm.fullName.trim(),
-        mobile: addressForm.mobile.trim(),
+        fullName: addressForm.fullName?.trim() || userProfile?.name || '',
+        mobile: addressForm.mobile?.trim() || userProfile?.mobile || '',
         house: addressForm.house.trim(),
         street: addressForm.street.trim(),
         area: addressForm.area?.trim() || '',
@@ -297,14 +286,18 @@ export const ProfilePage: React.FC = () => {
       setIsAddressModalOpen(false);
       setShowSuccessToast({
         show: true,
-        message: 'Primary shipping address updated successfully!',
+        message: 'Primary shipping address saved successfully!',
       });
       setTimeout(() => setShowSuccessToast({ show: false, message: '' }), 3500);
-    }, 350);
+    }, 300);
   };
 
-  // Active address determination
-  const activeAddress = savedAddress || userProfile?.addressDetails;
+  // Active address determination - only true if there is an actual saved address with valid required fields
+  const activeAddress = (savedAddress && savedAddress.house && savedAddress.street && savedAddress.city) 
+    ? savedAddress 
+    : (userProfile?.addressDetails && userProfile.addressDetails.house && userProfile.addressDetails.street) 
+      ? userProfile.addressDetails 
+      : null;
 
   // ----------------------------------------------------
   // VIEW 1: SIGN-UP FORM (When NOT logged in)
@@ -638,7 +631,7 @@ export const ProfilePage: React.FC = () => {
                 {activeAddress && (
                   <button
                     type="button"
-                    onClick={handleOpenAddressModal}
+                    onClick={() => handleOpenAddressModal(true)}
                     className="text-xs font-bold text-[#801723] hover:text-[#5C0F1B] bg-white hover:bg-[#FAF3E0] py-1.5 px-3 rounded-xl border border-[#EAE3D2] hover:border-[#D4AF37] flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
                   >
                     <Edit3 className="w-3.5 h-3.5" />
@@ -679,13 +672,13 @@ export const ProfilePage: React.FC = () => {
                 </div>
               ) : (
                 <div className="pt-2 pl-0 sm:pl-13">
-                  <div className="bg-white/80 p-4 sm:p-5 rounded-xl border border-dashed border-[#D4AF37]/60 text-center space-y-3">
+                  <div className="bg-white/80 p-5 rounded-xl border border-dashed border-[#D4AF37]/60 text-center space-y-3">
                     <div className="w-10 h-10 rounded-full bg-[#FAF3E0] border border-[#D4AF37]/40 flex items-center justify-center mx-auto text-[#801723]">
                       <Home className="w-5 h-5" />
                     </div>
                     <div>
                       <h4 className="text-xs sm:text-sm font-bold text-[#3B0C13]">
-                        No shipping address added yet
+                        No address saved
                       </h4>
                       <p className="text-[11px] text-[#7A695C] mt-0.5 max-w-sm mx-auto">
                         Add your primary delivery address for 1-click express checkout and fast door delivery.
@@ -693,11 +686,11 @@ export const ProfilePage: React.FC = () => {
                     </div>
                     <button
                       type="button"
-                      onClick={handleOpenAddressModal}
+                      onClick={() => handleOpenAddressModal(false)}
                       className="inline-flex items-center gap-1.5 py-2 px-4 rounded-xl bg-[#5C0F1B] hover:bg-[#4A0E17] text-[#DFBA67] text-xs font-bold uppercase tracking-wider border border-[#D4AF37] shadow-sm hover:shadow-md transition-all active:scale-95 cursor-pointer"
                     >
                       <Plus className="w-3.5 h-3.5" />
-                      <span>+ Add New Address</span>
+                      <span>+ Add Address</span>
                     </button>
                   </div>
                 </div>
@@ -764,77 +757,12 @@ export const ProfilePage: React.FC = () => {
               </button>
             </div>
 
-            {/* Modal Body / Form */}
+            {/* Modal Body / Form - Clean Blank Inputs */}
             <form onSubmit={handleSaveAddress} className="p-6 overflow-y-auto space-y-4">
-              {/* Receiver Full Name */}
+              {/* 1. House / Flat / Building No. */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-[#3B0C13] mb-1">
-                  Full Name / Receiver Name <span className="text-rose-700">*</span>
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#8C7A6B]">
-                    <User className="w-4 h-4" />
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="e.g. Priya Verma"
-                    value={addressForm.fullName}
-                    onChange={e => {
-                      setAddressForm(prev => ({ ...prev, fullName: e.target.value }));
-                      if (addressErrors.fullName) {
-                        setAddressErrors(prev => ({ ...prev, fullName: undefined }));
-                      }
-                    }}
-                    className={`w-full pl-9 pr-3 py-2.5 bg-[#FCF9F2] text-xs sm:text-sm text-[#2D2622] rounded-xl border transition-all focus:outline-none focus:ring-2 ${
-                      addressErrors.fullName
-                        ? 'border-red-400 focus:ring-red-400 bg-red-50/40'
-                        : 'border-[#EAE3D2] focus:border-[#5C0F1B] focus:ring-[#5C0F1B]/20'
-                    }`}
-                  />
-                </div>
-                {addressErrors.fullName && (
-                  <p className="text-[11px] text-red-600 font-semibold mt-1">
-                    {addressErrors.fullName}
-                  </p>
-                )}
-              </div>
-
-              {/* Mobile Number (10 digits) */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-[#3B0C13] mb-1">
-                  Mobile Number <span className="text-rose-700">*</span>
-                </label>
-                <div className="relative flex rounded-xl overflow-hidden border border-[#EAE3D2] focus-within:border-[#5C0F1B] focus-within:ring-2 focus-within:ring-[#5C0F1B]/20 transition-all bg-[#FCF9F2]">
-                  <div className="flex items-center gap-1 px-3 bg-[#F2EAE0] border-r border-[#EAE3D2] text-xs font-bold text-[#4A0E17] select-none">
-                    <span>+91</span>
-                  </div>
-                  <input
-                    type="tel"
-                    inputMode="numeric"
-                    maxLength={10}
-                    placeholder="10-digit mobile number"
-                    value={addressForm.mobile}
-                    onChange={e => {
-                      const num = e.target.value.replace(/\D/g, '').slice(0, 10);
-                      setAddressForm(prev => ({ ...prev, mobile: num }));
-                      if (addressErrors.mobile) {
-                        setAddressErrors(prev => ({ ...prev, mobile: undefined }));
-                      }
-                    }}
-                    className="w-full px-3 py-2.5 text-xs sm:text-sm text-[#2D2622] font-medium bg-transparent focus:outline-none"
-                  />
-                </div>
-                {addressErrors.mobile && (
-                  <p className="text-[11px] text-red-600 font-semibold mt-1">
-                    {addressErrors.mobile}
-                  </p>
-                )}
-              </div>
-
-              {/* Flat / House No. / Building Name */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-[#3B0C13] mb-1">
-                  Flat / House No. / Building Name <span className="text-rose-700">*</span>
+                  House / Flat / Building No. <span className="text-rose-700">*</span>
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#8C7A6B]">
@@ -842,7 +770,7 @@ export const ProfilePage: React.FC = () => {
                   </div>
                   <input
                     type="text"
-                    placeholder="e.g. Flat 302, Royal Residency"
+                    placeholder="Enter house, flat or building number"
                     value={addressForm.house}
                     onChange={e => {
                       setAddressForm(prev => ({ ...prev, house: e.target.value }));
@@ -864,10 +792,10 @@ export const ProfilePage: React.FC = () => {
                 )}
               </div>
 
-              {/* Street / Area / Locality */}
+              {/* 2. Street / Road / Area */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-[#3B0C13] mb-1">
-                  Street / Area / Locality <span className="text-rose-700">*</span>
+                  Street / Road / Area <span className="text-rose-700">*</span>
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#8C7A6B]">
@@ -875,7 +803,7 @@ export const ProfilePage: React.FC = () => {
                   </div>
                   <input
                     type="text"
-                    placeholder="e.g. 1st Cross, Indiranagar Stage 2"
+                    placeholder="Enter street, road or area name"
                     value={addressForm.street}
                     onChange={e => {
                       setAddressForm(prev => ({ ...prev, street: e.target.value }));
@@ -897,7 +825,28 @@ export const ProfilePage: React.FC = () => {
                 )}
               </div>
 
-              {/* Two Column Row: City & State */}
+              {/* 3. Landmark (Optional) */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-[#3B0C13] mb-1">
+                  Landmark <span className="text-[#7A695C] font-normal lowercase">(optional)</span>
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#8C7A6B]">
+                    <Navigation className="w-4 h-4" />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="e.g. Near Metro Station / Temple"
+                    value={addressForm.landmark || ''}
+                    onChange={e => {
+                      setAddressForm(prev => ({ ...prev, landmark: e.target.value }));
+                    }}
+                    className="w-full pl-9 pr-3 py-2.5 bg-[#FCF9F2] text-xs sm:text-sm text-[#2D2622] rounded-xl border border-[#EAE3D2] focus:border-[#5C0F1B] focus:ring-2 focus:ring-[#5C0F1B]/20 transition-all focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* 4. Two Column Row: City & State */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 {/* City */}
                 <div>
@@ -906,7 +855,7 @@ export const ProfilePage: React.FC = () => {
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. Bengaluru"
+                    placeholder="Enter city"
                     value={addressForm.city}
                     onChange={e => {
                       setAddressForm(prev => ({ ...prev, city: e.target.value }));
@@ -961,7 +910,7 @@ export const ProfilePage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Pincode (6 digits) */}
+              {/* 5. Pincode (6 digits) */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-[#3B0C13] mb-1">
                   Pincode (6 Digits) <span className="text-rose-700">*</span>
@@ -970,7 +919,7 @@ export const ProfilePage: React.FC = () => {
                   type="text"
                   inputMode="numeric"
                   maxLength={6}
-                  placeholder="e.g. 560038"
+                  placeholder="Enter 6-digit pincode"
                   value={addressForm.pin}
                   onChange={e => {
                     const pin = e.target.value.replace(/\D/g, '').slice(0, 6);

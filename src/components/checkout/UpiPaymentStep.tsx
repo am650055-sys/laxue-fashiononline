@@ -22,6 +22,14 @@ import {
 } from 'lucide-react';
 import { Order } from '../../types';
 import { useShop } from '../../context/ShopContext';
+import {
+  UpiBrandIcon,
+  PhonePeIcon,
+  GPayIcon,
+  PaytmIcon,
+  BhimUpiIcon,
+  OtherUpiCollageIcon,
+} from './UpiBrandIcons';
 
 interface UpiPaymentStepProps {
   order: Order;
@@ -55,7 +63,7 @@ const UPI_APPS: UpiAppItem[] = [
     textColor: 'text-white',
     borderColor: 'border-[#5f259f]',
     badgeColor: 'bg-purple-900/40 text-purple-200',
-    tag: '🟣 Popular & Fast',
+    tag: '🟣 Popular & Fast • 0% Fee',
     iconType: 'phonepe',
     intentPrefix: 'phonepe://pay',
   },
@@ -63,11 +71,11 @@ const UPI_APPS: UpiAppItem[] = [
     id: 'gpay',
     name: 'Google Pay',
     shortName: 'Google Pay',
-    colorBg: 'bg-[#1a73e8]',
-    textColor: 'text-white',
+    colorBg: 'bg-white',
+    textColor: 'text-[#3C4043]',
     borderColor: 'border-[#1a73e8]',
     badgeColor: 'bg-blue-900/40 text-blue-200',
-    tag: '🔵 Instant Bank Pay',
+    tag: '🔵 Instant Bank UPI Transfer',
     iconType: 'gpay',
     intentPrefix: 'tez://upi/pay',
   },
@@ -75,11 +83,11 @@ const UPI_APPS: UpiAppItem[] = [
     id: 'paytm',
     name: 'Paytm UPI',
     shortName: 'Paytm',
-    colorBg: 'bg-[#002e6e]',
-    textColor: 'text-white',
+    colorBg: 'bg-white',
+    textColor: 'text-[#002E6E]',
     borderColor: 'border-[#00b9f5]',
     badgeColor: 'bg-cyan-900/40 text-cyan-200',
-    tag: '🔵 Paytm Wallet & UPI',
+    tag: '🔵 Paytm Wallet & Direct UPI',
     iconType: 'paytm',
     intentPrefix: 'paytmmp://pay',
   },
@@ -87,11 +95,11 @@ const UPI_APPS: UpiAppItem[] = [
     id: 'bhim',
     name: 'BHIM UPI',
     shortName: 'BHIM',
-    colorBg: 'bg-[#00875a]',
-    textColor: 'text-white',
+    colorBg: 'bg-white',
+    textColor: 'text-[#1C2D42]',
     borderColor: 'border-[#00875a]',
     badgeColor: 'bg-emerald-900/40 text-emerald-200',
-    tag: '🟢 Govt NPCI Official',
+    tag: '🟢 Govt NPCI Official Gateway',
     iconType: 'bhim',
     intentPrefix: 'bhim://pay',
   },
@@ -99,11 +107,11 @@ const UPI_APPS: UpiAppItem[] = [
     id: 'other',
     name: 'Other UPI Apps',
     shortName: 'Any UPI App',
-    colorBg: 'bg-[#3B0C13]',
-    textColor: 'text-[#DFBA67]',
+    colorBg: 'bg-[#FAF7F2]',
+    textColor: 'text-[#801723]',
     borderColor: 'border-[#D4AF37]',
     badgeColor: 'bg-[#2B090E] text-[#DFBA67]',
-    tag: '🟢 Cred, Amazon Pay, etc.',
+    tag: '🟢 CRED, Amazon Pay, WhatsApp',
     iconType: 'other',
     intentPrefix: 'upi://pay',
   },
@@ -712,7 +720,7 @@ export const UpiPaymentStep: React.FC<UpiPaymentStepProps> = ({ order, onBack, o
           )}
 
           {/* UPI App Buttons Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             {UPI_APPS.map(app => (
               <button
                 key={app.id}
@@ -720,39 +728,35 @@ export const UpiPaymentStep: React.FC<UpiPaymentStepProps> = ({ order, onBack, o
                 onClick={() => handleLaunchUpiApp(app)}
                 className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer relative overflow-hidden group hover:scale-[1.01] shadow-xs ${
                   selectedApp?.id === app.id
-                    ? 'border-[#4A0E17] bg-[#FAF6EE] ring-2 ring-[#4A0E17]/20'
-                    : 'border-[#EAE3D2] bg-white hover:border-[#D4AF37]'
+                    ? 'border-[#4A0E17] bg-[#FAF6EE] ring-2 ring-[#4A0E17]/20 shadow-md'
+                    : 'border-[#EAE3D2] bg-white hover:border-[#D4AF37] hover:shadow-md'
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    {/* App Icon Representation */}
-                    <div
-                      className={`w-11 h-11 rounded-xl flex items-center justify-center shadow-xs font-bold text-sm shrink-0 ${app.colorBg} ${app.textColor}`}
-                    >
-                      {app.iconType === 'phonepe' && <span>Pe</span>}
-                      {app.iconType === 'gpay' && <span>G</span>}
-                      {app.iconType === 'paytm' && <span>Pay</span>}
-                      {app.iconType === 'bhim' && <span>BHIM</span>}
-                      {app.iconType === 'other' && <Smartphone className="w-5 h-5 text-[#DFBA67]" />}
-                    </div>
+                  <div className="flex items-center gap-3.5">
+                    {/* Official Brand Logo Badge (44px x 44px with 10px radius) */}
+                    <UpiBrandIcon type={app.iconType} size={44} />
 
                     <div>
-                      <span className="font-serif-luxury font-bold text-sm text-[#3B0C13] block">
+                      <span className="font-serif-luxury font-bold text-sm text-[#3B0C13] block group-hover:text-[#4A0E17] transition-colors">
                         {app.name}
                       </span>
-                      <span className="text-[11px] text-[#7A695C]">{app.tag}</span>
+                      <span className="text-[11px] text-[#7A695C] font-medium block mt-0.5">
+                        {app.tag}
+                      </span>
                     </div>
                   </div>
 
-                  <div className="flex items-center text-[#801723] group-hover:translate-x-1 transition-transform">
+                  <div className="flex items-center text-[#801723] group-hover:translate-x-1 transition-transform pl-2 shrink-0">
                     <ChevronRight className="w-4 h-4" />
                   </div>
                 </div>
 
                 <div className="mt-3 pt-2.5 border-t border-[#EAE3D2]/70 flex items-center justify-between text-[11px]">
-                  <span className="text-[#8C7A6B]">Payable Amount:</span>
-                  <span className="font-bold text-[#4A0E17]">₹{exactAmount.toLocaleString('en-IN')}</span>
+                  <span className="text-[#8C7A6B] font-medium">Payable Amount:</span>
+                  <span className="font-bold text-[#4A0E17] text-xs font-mono">
+                    ₹{exactAmount.toLocaleString('en-IN')}
+                  </span>
                 </div>
               </button>
             ))}
@@ -760,9 +764,13 @@ export const UpiPaymentStep: React.FC<UpiPaymentStepProps> = ({ order, onBack, o
 
           {/* App Launched / Verification In Progress Card */}
           {verificationState === 'app_launched' && (
-            <div className="bg-[#FAF8F5] p-5 rounded-2xl border-2 border-[#D4AF37]/50 space-y-4 text-center">
-              <div className="w-12 h-12 rounded-full bg-[#FAF6EE] border-2 border-[#D4AF37] flex items-center justify-center mx-auto text-[#4A0E17]">
-                <Smartphone className="w-6 h-6 text-[#801723] animate-bounce" />
+            <div className="bg-[#FAF8F5] p-5 sm:p-6 rounded-2xl border-2 border-[#D4AF37]/50 space-y-4 text-center">
+              <div className="w-14 h-14 rounded-2xl bg-white border-2 border-[#D4AF37] flex items-center justify-center mx-auto shadow-md p-1">
+                {selectedApp ? (
+                  <UpiBrandIcon type={selectedApp.iconType} size={44} />
+                ) : (
+                  <Smartphone className="w-6 h-6 text-[#801723] animate-bounce" />
+                )}
               </div>
 
               <div>
@@ -1017,9 +1025,16 @@ export const UpiPaymentStep: React.FC<UpiPaymentStepProps> = ({ order, onBack, o
                 </div>
 
                 {/* Supported Apps List */}
-                <p className="text-[10px] text-[#8C7A6B] font-medium">
-                  Scan with PhonePe • Google Pay • Paytm • BHIM • Cred • Any App
-                </p>
+                <div className="pt-2 border-t border-[#EAE3D2]/70 flex items-center justify-center gap-2 flex-wrap">
+                  <span className="text-[10px] text-[#8C7A6B] font-bold mr-1">PAY WITH ANY APP:</span>
+                  <div className="flex items-center gap-1.5">
+                    <PhonePeIcon size={24} />
+                    <GPayIcon size={24} />
+                    <PaytmIcon size={24} />
+                    <BhimUpiIcon size={24} />
+                    <OtherUpiCollageIcon size={24} />
+                  </div>
+                </div>
               </div>
 
               {/* Verification & UTR Submission Box */}
