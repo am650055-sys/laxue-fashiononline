@@ -13,7 +13,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onLoginSuccess }
   const [isLoading, setIsLoading] = useState(false);
   const [showForgotModal, setShowForgotModal] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSuccessMessage(null);
@@ -24,99 +24,37 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onLoginSuccess }
     const cleanPassword = password.trim();
 
     if (!cleanEmail || !cleanPassword) {
-      setError('Please provide both email and password.');
+      setError('Invalid email or password');
       setIsLoading(false);
       return;
     }
 
     const defaultAdminToken = 'luxue-admin-jwt-token-2026';
-    const isDefaultAdminCredential =
-      (cleanEmail === 'admin@luxue.com' || cleanEmail === 'admin') && cleanPassword === 'admin123';
 
-    try {
-      // 2. Production API Request with proper headers
-      const res = await fetch('/api/admin/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        body: JSON.stringify({ email: cleanEmail, password: cleanPassword }),
-      });
+    // 2. Direct Static / Client-Side Credentials Check
+    if ((cleanEmail === 'admin@luxue.com' || cleanEmail === 'admin') && cleanPassword === 'admin123') {
+      // 3. Success Action: Store authentication state in localStorage and sessionStorage
+      localStorage.setItem('isAuthenticated', 'true');
+      localStorage.setItem('luxue_admin_token', defaultAdminToken);
+      sessionStorage.setItem(
+        'luxue_admin_session',
+        JSON.stringify({
+          email: cleanEmail,
+          role: 'admin',
+          authenticated: true,
+          loginTime: new Date().toISOString(),
+        })
+      );
 
-      if (res.ok) {
-        const data = await res.json();
-        const token = data.token || defaultAdminToken;
-
-        // Persist session
-        localStorage.setItem('luxue_admin_token', token);
-        sessionStorage.setItem(
-          'luxue_admin_session',
-          JSON.stringify({
-            email: cleanEmail,
-            role: 'admin',
-            source: 'server_api',
-            loginTime: new Date().toISOString(),
-          })
-        );
-
-        setSuccessMessage('Authentication verified. Accessing Admin Console...');
-        setTimeout(() => {
-          onLoginSuccess(token);
-        }, 400);
-        return;
-      }
-
-      // If server returned 401 or other status code
-      const errData = await res.json().catch(() => ({}));
-
-      // If server rejects credentials but they match authorized default credentials (e.g. proxy mismatch)
-      if (isDefaultAdminCredential) {
-        console.warn('Backend returned non-200. Applying authenticated client-side fallback.');
-        localStorage.setItem('luxue_admin_token', defaultAdminToken);
-        sessionStorage.setItem(
-          'luxue_admin_session',
-          JSON.stringify({
-            email: cleanEmail,
-            role: 'admin',
-            source: 'client_fallback',
-            loginTime: new Date().toISOString(),
-          })
-        );
-        setSuccessMessage('Authenticated with authorized admin session. Redirecting...');
-        setTimeout(() => {
-          onLoginSuccess(defaultAdminToken);
-        }, 400);
-        return;
-      }
-
-      setError(errData.error || 'Invalid administrator credentials. Please check your credentials.');
-    } catch (networkErr) {
-      console.warn('Backend network error/offline or CORS preflight on static host. Checking local validation fallback...', networkErr);
-
-      // 3. Client-Side / Static Demo Fallback (Netlify, CORS, or offline server)
-      if (isDefaultAdminCredential) {
-        localStorage.setItem('luxue_admin_token', defaultAdminToken);
-        sessionStorage.setItem(
-          'luxue_admin_session',
-          JSON.stringify({
-            email: cleanEmail,
-            role: 'admin',
-            source: 'client_static_demo_fallback',
-            loginTime: new Date().toISOString(),
-          })
-        );
-
-        setSuccessMessage('Offline admin authentication verified. Loading Admin Console...');
-        setTimeout(() => {
-          onLoginSuccess(defaultAdminToken);
-        }, 400);
-        return;
-      }
-
-      setError('Authentication failed. Please verify your credentials or use the default admin login.');
-    } finally {
+      setSuccessMessage('Authentication successful! Loading Admin Dashboard...');
+      setTimeout(() => {
+        setIsLoading(false);
+        onLoginSuccess(defaultAdminToken);
+      }, 300);
+    } else {
+      // 4. Error Handling: Clean client-side message
       setIsLoading(false);
+      setError('Invalid email or password');
     }
   };
 
