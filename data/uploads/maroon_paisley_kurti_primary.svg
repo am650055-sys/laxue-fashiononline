@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1066" viewBox="0 0 800 1066">
+  <rect width="800" height="1066" fill="#e8e6e3"/>
+  <!-- Model Background & Shadows -->
+  <ellipse cx="400" cy="1000" rx="250" ry="30" fill="rgba(0,0,0,0.1)"/>
+  
+  <!-- Maroon Paisley Kurti -->
+  <path d="M 300 220 L 500 220 L 580 320 L 610 650 L 560 650 L 530 420 L 520 780 L 280 780 L 270 420 L 240 650 L 190 650 L 220 320 Z" fill="#800020"/>
+  
+  <!-- Square Neckline -->
+  <rect x="350" y="220" width="100" height="80" fill="#e8e6e3"/>
+  <rect x="345" y="220" width="110" height="85" fill="none" stroke="#ffffff" stroke-width="3"/>
+  
+  <!-- White Paisley & Geometric Bandana Pattern Overlay -->
+  <g stroke="#ffffff" stroke-width="2" fill="none" opacity="0.9">
+    <!-- Border Frames -->
+    <rect x="235" y="325" width="330" height="445" rx="5"/>
+    <rect x="245" y="335" width="310" height="425" rx="5"/>
+    
+    <!-- Paisley Motifs Left -->
+    <path d="M 280 380 C 260 360, 260 410, 280 430 C 300 450, 310 400, 280 380 Z"/>
+    <path d="M 280 500 C 260 480, 260 530, 280 550 C 300 570, 310 520, 280 500 Z"/>
+    <path d="M 280 620 C 260 600, 260 650, 280 670 C 300 690, 310 640, 280 620 Z"/>
+    
+    <!-- Paisley Motifs Right -->
+    <path d="M 520 380 C 540 360, 540 410, 520 430 C 500 450, 490 400, 520 380 Z"/>
+    <path d="M 520 500 C 540 480, 540 530, 520 550 C 500 570, 490 520, 520 500 Z"/>
+    <path d="M 520 620 C 540 600, 540 650, 520 670 C 500 690, 490 640, 520 620 Z"/>
+
+    <!-- Geometric Center Block -->
+    <rect x="330" y="360" width="140" height="180"/>
+    <rect x="340" y="370" width="120" height="160"/>
+    <circle cx="400" cy="450" r="40"/>
+    <circle cx="400" cy="450" r="25"/>
+    
+    <!-- Lower Geometric Block -->
+    <rect x="330" y="560" width="140" height="180"/>
+    <rect x="340" y="570" width="120" height="160"/>
+    <circle cx="400" cy="650" r="40"/>
+    
+    <!-- Sleeve Bandana Motifs -->
+    <line x1="220" y1="350" x2="190" y2="650"/>
+    <line x1="580" y1="350" x2="610" y2="650"/>
+  </g>
+  
+  <!-- Black Straight Trousers -->
+  <rect x="290" y="775" width="95" height="250" fill="#1a1a1a"/>
+  <rect x="415" y="775" width="95" height="250" fill="#1a1a1a"/>
+</svg>

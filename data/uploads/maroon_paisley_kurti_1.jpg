@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1066" viewBox="0 0 800 1066">
+  <rect width="800" height="1066" fill="#e2ded9"/>
+  <!-- Model Shadow -->
+  <ellipse cx="400" cy="1010" rx="220" ry="25" fill="rgba(0,0,0,0.12)"/>
+  
+  <!-- Head & Hair -->
+  <path d="M 330 180 Q 400 60 470 180 Q 480 320 470 380 Q 330 380 330 180 Z" fill="#2b1a10"/>
+  <ellipse cx="400" cy="190" rx="60" ry="75" fill="#d9a07b"/>
+  <!-- Facial Features -->
+  <path d="M 370 205 Q 400 220 430 205" stroke="#7a3e2b" stroke-width="3" fill="none"/>
+  
+  <!-- Black Straight Trousers -->
+  <rect x="300" y="760" width="85" height="250" fill="#181818" rx="4"/>
+  <rect x="415" y="760" width="85" height="250" fill="#181818" rx="4"/>
+  
+  <!-- Maroon Kurti Base -->
+  <path d="M 310 240 L 490 240 L 570 330 L 595 670 L 550 670 L 525 430 L 515 770 L 285 770 L 275 430 L 250 670 L 205 670 L 230 330 Z" fill="#7a0c1e"/>
+  
+  <!-- Square Neckline -->
+  <rect x="350" y="240" width="100" height="80" fill="#d9a07b"/>
+  <rect x="345" y="240" width="110" height="85" fill="none" stroke="#ffffff" stroke-width="3"/>
+  
+  <!-- White Paisley Bandana Motif Overlay -->
+  <g stroke="#ffffff" stroke-width="2.5" fill="none" opacity="0.95">
+    <rect x="238" y="335" width="324" height="425" rx="4"/>
+    <rect x="248" y="345" width="304" height="405" rx="4"/>
+    
+    <!-- Paisley Motifs Left -->
+    <path d="M 280 390 C 260 370, 260 420, 280 440 C 300 460, 310 410, 280 390 Z" fill="#ffffff" fill-opacity="0.2"/>
+    <path d="M 280 510 C 260 490, 260 540, 280 560 C 300 580, 310 530, 280 510 Z" fill="#ffffff" fill-opacity="0.2"/>
+    <path d="M 280 630 C 260 610, 260 660, 280 680 C 300 700, 310 650, 280 630 Z" fill="#ffffff" fill-opacity="0.2"/>
+    
+    <!-- Paisley Motifs Right -->
+    <path d="M 520 390 C 540 370, 540 420, 520 440 C 500 460, 490 410, 520 390 Z" fill="#ffffff" fill-opacity="0.2"/>
+    <path d="M 520 510 C 540 490, 540 540, 520 560 C 500 580, 490 530, 520 510 Z" fill="#ffffff" fill-opacity="0.2"/>
+    <path d="M 520 630 C 540 610, 540 660, 520 680 C 500 700, 490 650, 520 630 Z" fill="#ffffff" fill-opacity="0.2"/>
+
+    <!-- Geometric Blocks -->
+    <rect x="330" y="370" width="140" height="170"/>
+    <circle cx="400" cy="455" r="35"/>
+    <rect x="330" y="570" width="140" height="170"/>
+    <circle cx="400" cy="655" r="35"/>
+  </g>
+  <text x="400" y="1040" text-anchor="middle" font-family="sans-serif" font-size="16" font-weight="bold" fill="#7a0c1e">LUXUE FASHION - Maroon Paisley Straight Kurti</text>
+</svg>

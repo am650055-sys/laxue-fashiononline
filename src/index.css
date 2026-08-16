@@ -1,0 +1,97 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-serif: 'Playfair Display', 'Cinzel', Georgia, serif;
+    --font-sans: 'Inter', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    --color-wine: #5B0F15;
+    --color-gold: #C5A059;
+    --color-bg: #F9F5F0;
+    --color-text: #1A1A1A;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background-color: #F9F5F0;
+    color: #1A1A1A;
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, h4, .font-serif-luxury {
+    font-family: var(--font-serif);
+  }
+}
+
+/* Custom scrollbar for horizontal product list */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Luxury Shine & Sparkle Animations */
+@keyframes sparkle {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+
+.animate-sparkle {
+  animation: sparkle 3s infinite ease-in-out;
+}
+
+@keyframes floatPetal {
+  0% { transform: translateY(0px) rotate(0deg); opacity: 0.8; }
+  50% { transform: translateY(-12px) rotate(15deg); opacity: 1; }
+  100% { transform: translateY(0px) rotate(0deg); opacity: 0.8; }
+}
+
+.animate-petal {
+  animation: floatPetal 6s infinite ease-in-out;
+}
+
+/* Gold & Wine Gradient utilities for Prestige Aesthetic */
+.bg-gold-gradient {
+  background: linear-gradient(135deg, #D8B56F 0%, #C5A059 50%, #E2C485 100%);
+}
+
+.bg-wine-gradient {
+  background: linear-gradient(135deg, #7A151C 0%, #5B0F15 50%, #3D090E 100%);
+}
+
+.text-gold-gradient {
+  background: linear-gradient(135deg, #C5A059 0%, #D8B56F 50%, #9A7B39 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.text-wine {
+  color: #5B0F15;
+}
+
+.bg-wine {
+  background-color: #5B0F15;
+}
+
+.border-wine {
+  border-color: #5B0F15;
+}
+
+.text-gold {
+  color: #C5A059;
+}
+
+.bg-gold {
+  background-color: #C5A059;
+}
+
+.border-gold {
+  border-color: #C5A059;
+}
+
+.border-gold-gradient {
+  border-image: linear-gradient(135deg, #C5A059, #F3E5AB, #9A7B39) 1;
+}
+
+

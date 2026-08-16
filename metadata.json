@@ -1,0 +1,6 @@
+{
+  "name": "LUXUE FASHION ONLINE",
+  "description": "Luxury Women's Kurtis & Indian Ethnic Fashion Store featuring exclusive Rakhi Festive Edit and curated collections.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
