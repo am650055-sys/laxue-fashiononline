@@ -160,8 +160,84 @@ export const UpiPaymentStep: React.FC<UpiPaymentStepProps> = ({ order, onBack, o
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const merchantUpiId = settings.merchantUpiId || settings.paymentSettings?.merchantUpiId || 'luxuefashion@icici';
-  const merchantName = settings.merchantName || settings.paymentSettings?.merchantName || 'LUXUE FASHION ONLINE';
+  // Live Merchant & UPI state fetched directly from server database
+  const [liveUpiId, setLiveUpiId] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem('admin_upi_settings');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.merchantUpiId || parsed.upiId) return parsed.merchantUpiId || parsed.upiId;
+      }
+    } catch {}
+    return settings.merchantUpiId || settings.paymentSettings?.merchantUpiId || '';
+  });
+
+  const [liveMerchantName, setLiveMerchantName] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem('admin_upi_settings');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.merchantName) return parsed.merchantName;
+      }
+    } catch {}
+    return settings.merchantName || settings.paymentSettings?.merchantName || 'LUXUE FASHION ONLINE';
+  });
+
+  // Direct fetch on mount from server database with no-cache headers
+  useEffect(() => {
+    const fetchFreshPaymentConfig = async () => {
+      try {
+        const res = await fetch(`/api/payment-config?t=${Date.now()}`, {
+          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data) {
+            const upi = data.merchantUpiId || data.upiId || '';
+            const name = data.merchantName || data.businessName || 'LUXUE FASHION ONLINE';
+            if (upi) {
+              setLiveUpiId(upi);
+            }
+            if (name) {
+              setLiveMerchantName(name);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to fetch fresh payment config on checkout mount:', err);
+      }
+    };
+
+    fetchFreshPaymentConfig();
+
+    const handleSettingsUpdated = (e: any) => {
+      const detail = e.detail;
+      if (detail?.merchantUpiId || detail?.upiId) {
+        setLiveUpiId(detail.merchantUpiId || detail.upiId);
+      }
+      if (detail?.merchantName) {
+        setLiveMerchantName(detail.merchantName);
+      }
+    };
+
+    window.addEventListener('luxue_payment_settings_updated', handleSettingsUpdated);
+    return () => window.removeEventListener('luxue_payment_settings_updated', handleSettingsUpdated);
+  }, []);
+
+  // Also sync with settings prop updates
+  useEffect(() => {
+    const propUpi = settings.merchantUpiId || settings.paymentSettings?.merchantUpiId;
+    if (propUpi) {
+      setLiveUpiId(propUpi);
+    }
+    const propName = settings.merchantName || settings.paymentSettings?.merchantName;
+    if (propName) {
+      setLiveMerchantName(propName);
+    }
+  }, [settings]);
+
+  const merchantUpiId = liveUpiId || settings.merchantUpiId || settings.paymentSettings?.merchantUpiId || '';
+  const merchantName = liveMerchantName || settings.merchantName || settings.paymentSettings?.merchantName || 'LUXUE FASHION ONLINE';
   const exactAmount = order.totalAmount;
   const paymentReference = `LUX_${order.id}`;
 
@@ -176,9 +252,11 @@ export const UpiPaymentStep: React.FC<UpiPaymentStepProps> = ({ order, onBack, o
   const buildUpiPayload = useCallback(
     (customPrefix?: string) => {
       const prefix = customPrefix || 'upi://pay';
+      const currentUpi = liveUpiId || merchantUpiId;
+      const currentName = liveMerchantName || merchantName;
       const params = new URLSearchParams({
-        pa: merchantUpiId,
-        pn: merchantName,
+        pa: currentUpi,
+        pn: currentName,
         am: exactAmount.toFixed(2),
         cu: 'INR',
         tr: order.id,
@@ -186,11 +264,16 @@ export const UpiPaymentStep: React.FC<UpiPaymentStepProps> = ({ order, onBack, o
       });
       return `${prefix}?${params.toString()}`;
     },
-    [merchantUpiId, merchantName, exactAmount, order.id]
+    [liveUpiId, merchantUpiId, liveMerchantName, merchantName, exactAmount, order.id]
   );
 
   // Generate QR Code data URL dynamically
   useEffect(() => {
+    const currentUpi = liveUpiId || merchantUpiId;
+    if (!currentUpi) {
+      setQrDataUrl('');
+      return;
+    }
     const payload = buildUpiPayload('upi://pay');
     QRCode.toDataURL(payload, {
       width: 320,
@@ -203,7 +286,7 @@ export const UpiPaymentStep: React.FC<UpiPaymentStepProps> = ({ order, onBack, o
     })
       .then(url => setQrDataUrl(url))
       .catch(err => console.error('QR Generation error:', err));
-  }, [buildUpiPayload]);
+  }, [buildUpiPayload, liveUpiId, merchantUpiId]);
 
   // Handle switching to QR Code tab with 5-second premium loader
   const handleSelectQrOption = () => {

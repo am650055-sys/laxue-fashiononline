@@ -210,7 +210,9 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(true);
       const safeFetchJson = async (url: string) => {
         try {
-          const res = await fetch(url);
+          const res = await fetch(url, {
+            headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+          });
           const contentType = res.headers.get('content-type') || '';
           if (res.ok && contentType.includes('application/json')) {
             return await res.json();
@@ -221,11 +223,13 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return null;
       };
 
-      const [prodData, catData, offerData, setData] = await Promise.all([
-        safeFetchJson('/api/products'),
-        safeFetchJson('/api/categories'),
-        safeFetchJson('/api/rakhi-offer'),
-        safeFetchJson('/api/settings'),
+      const cacheBuster = `?t=${Date.now()}`;
+      const [prodData, catData, offerData, setData, payConfig] = await Promise.all([
+        safeFetchJson(`/api/products${cacheBuster}`),
+        safeFetchJson(`/api/categories${cacheBuster}`),
+        safeFetchJson(`/api/rakhi-offer${cacheBuster}`),
+        safeFetchJson(`/api/settings${cacheBuster}`),
+        safeFetchJson(`/api/payment-config${cacheBuster}`),
       ]);
 
       if (prodData && Array.isArray(prodData) && prodData.length > 0) {
@@ -237,13 +241,31 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (offerData && typeof offerData === 'object') {
         setRakhiOffer(offerData);
       }
-      if (setData && typeof setData === 'object') {
-        setSettings(prev => {
-          const merged = { ...prev, ...setData };
-          localStorage.setItem('luxue_store_settings', JSON.stringify(merged));
-          return merged;
-        });
-      }
+      
+      const serverUpi = payConfig?.merchantUpiId || payConfig?.upiId || setData?.merchantUpiId || setData?.paymentSettings?.merchantUpiId;
+      const serverMerchant = payConfig?.merchantName || payConfig?.businessName || setData?.merchantName || setData?.paymentSettings?.merchantName;
+
+      setSettings(prev => {
+        const merged = { ...prev, ...(setData || {}) };
+        if (serverUpi !== undefined) {
+          merged.merchantUpiId = serverUpi;
+          merged.paymentSettings = {
+            ...merged.paymentSettings,
+            merchantUpiId: serverUpi,
+            merchantName: serverMerchant || merged.merchantName,
+            upiEnabled: payConfig?.upiEnabled ?? merged.paymentSettings?.upiEnabled ?? true,
+            cardEnabled: payConfig?.cardEnabled ?? merged.paymentSettings?.cardEnabled ?? true,
+          };
+        }
+        if (serverMerchant !== undefined) {
+          merged.merchantName = serverMerchant;
+        }
+        localStorage.setItem('luxue_store_settings', JSON.stringify(merged));
+        if (serverUpi) {
+          localStorage.setItem('admin_upi_settings', JSON.stringify(merged.paymentSettings));
+        }
+        return merged;
+      });
     } catch (err) {
       console.warn('Data sync note (operating in static / client mode):', err);
     } finally {
@@ -259,79 +281,129 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     try {
-      fetch('/api/settings', {
+      const res = await fetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newSettings),
-      }).catch(() => {});
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.settings) {
+          setSettings(data.settings);
+          localStorage.setItem('luxue_store_settings', JSON.stringify(data.settings));
+        }
+      }
     } catch {}
 
     return true;
   };
 
   const updatePaymentSettings = async (payload: {
-    merchantUpiId: string;
-    merchantName: string;
+    merchantUpiId?: string;
+    upiId?: string;
+    merchantName?: string;
+    businessName?: string;
     upiEnabled: boolean;
     cardEnabled?: boolean;
     testModeEnabled?: boolean;
   }): Promise<{ success: boolean; message: string; error?: string }> => {
-    const cleanUpi = payload.merchantUpiId.trim();
-    const cleanName = payload.merchantName.trim() || 'LUXUE FASHION ONLINE';
+    const rawUpi = (payload.upiId || payload.merchantUpiId || '').trim();
+    const rawName = (payload.businessName || payload.merchantName || '').trim() || 'LUXUE FASHION ONLINE';
 
-    const upiData = {
-      merchantUpiId: cleanUpi,
-      upiId: cleanUpi,
-      merchantName: cleanName,
-      upiEnabled: payload.upiEnabled,
-      cardEnabled: payload.cardEnabled !== false,
-      testModeEnabled: !!payload.testModeEnabled,
-      lastUpdated: new Date().toISOString(),
-      lastUpdatedBy: 'Admin Console',
-    };
+    if (!rawUpi) {
+      return { success: false, message: 'UPI ID is required' };
+    }
 
-    // 1. Direct LocalStorage Persistence (Instant & works 100% on Netlify)
-    localStorage.setItem('admin_upi_settings', JSON.stringify(upiData));
-
-    // 2. Update Global Store Settings in State and LocalStorage
-    setSettings(prev => {
-      const updated: StoreSettings = {
-        ...prev,
-        merchantUpiId: cleanUpi,
-        merchantName: cleanName,
-        paymentSettings: {
-          ...prev.paymentSettings,
-          merchantUpiId: cleanUpi,
-          merchantName: cleanName,
-          upiEnabled: payload.upiEnabled,
-          cardEnabled: payload.cardEnabled !== false,
-          testModeEnabled: !!payload.testModeEnabled,
-          lastUpdated: upiData.lastUpdated,
-          lastUpdatedBy: upiData.lastUpdatedBy,
-        },
-      };
-      localStorage.setItem('luxue_store_settings', JSON.stringify(updated));
-      return updated;
-    });
-
-    // 3. Optional background server synchronization without blocking or throwing JSON parsing errors
     try {
       const token = localStorage.getItem('luxue_admin_token') || 'luxue-admin-jwt-token-2026';
-      fetch('/api/admin/payment-settings', {
+      const res = await fetch('/api/admin/payment-settings', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
           'x-admin-token': token,
         },
-        body: JSON.stringify(payload),
-      }).catch(() => {});
-    } catch {}
+        body: JSON.stringify({
+          upiId: rawUpi,
+          merchantUpiId: rawUpi,
+          businessName: rawName,
+          merchantName: rawName,
+          upiEnabled: payload.upiEnabled,
+          cardEnabled: payload.cardEnabled !== false,
+          testModeEnabled: !!payload.testModeEnabled,
+        }),
+      });
 
-    return {
-      success: true,
-      message: 'UPI Configuration updated successfully!',
-    };
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data || !data.success) {
+        const errorMsg = (data && (data.error || data.message)) || 'Failed to save UPI settings. Please try again.';
+        return { success: false, message: errorMsg, error: errorMsg };
+      }
+
+      const confirmedRecord = data.paymentSettings || data.settings?.paymentSettings;
+      const confirmedUpi = confirmedRecord?.upiId || confirmedRecord?.merchantUpiId || rawUpi;
+      const confirmedName = confirmedRecord?.businessName || confirmedRecord?.merchantName || rawName;
+      const confirmedUpiEnabled = confirmedRecord?.upiEnabled !== false;
+      const confirmedCardEnabled = confirmedRecord?.cardEnabled !== false;
+      const confirmedLastUpdated = confirmedRecord?.updatedAt || confirmedRecord?.lastUpdated || new Date().toISOString();
+
+      const upiData = {
+        upiId: confirmedUpi,
+        merchantUpiId: confirmedUpi,
+        businessName: confirmedName,
+        merchantName: confirmedName,
+        upiEnabled: confirmedUpiEnabled,
+        cardEnabled: confirmedCardEnabled,
+        testModeEnabled: !!payload.testModeEnabled,
+        updatedAt: confirmedLastUpdated,
+        lastUpdated: confirmedLastUpdated,
+        lastUpdatedBy: 'Admin Console',
+      };
+
+      // Direct LocalStorage & State Sync with confirmed DB values
+      localStorage.setItem('admin_upi_settings', JSON.stringify(upiData));
+
+      setSettings(prev => {
+        const updated: StoreSettings = {
+          ...prev,
+          merchantUpiId: confirmedUpi,
+          merchantName: confirmedName,
+          paymentSettings: {
+            ...prev.paymentSettings,
+            merchantUpiId: confirmedUpi,
+            merchantName: confirmedName,
+            upiId: confirmedUpi,
+            businessName: confirmedName,
+            upiEnabled: confirmedUpiEnabled,
+            cardEnabled: confirmedCardEnabled,
+            testModeEnabled: !!payload.testModeEnabled,
+            lastUpdated: upiData.lastUpdated,
+            updatedAt: upiData.updatedAt,
+            lastUpdatedBy: upiData.lastUpdatedBy,
+          },
+        };
+        localStorage.setItem('luxue_store_settings', JSON.stringify(updated));
+        return updated;
+      });
+
+      // Broadcast event across tabs/listeners
+      try {
+        window.dispatchEvent(new CustomEvent('luxue_payment_settings_updated', { detail: upiData }));
+      } catch {}
+
+      return {
+        success: true,
+        message: 'UPI Settings Saved Successfully',
+      };
+    } catch (err: any) {
+      console.error('Server sync error on save payment settings:', err);
+      return {
+        success: false,
+        message: 'Failed to save UPI settings. Please try again.',
+        error: err.message,
+      };
+    }
   };
 
   useEffect(() => {

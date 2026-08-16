@@ -44,7 +44,7 @@
         "Dusty Rose / Pink"
       ],
       "fabric": "100% Breathable Soft Cotton",
-      "stock": 50,
+      "stock": 49,
       "rating": 4.9,
       "reviewsCount": 29,
       "isNewArrival": true,
@@ -362,7 +362,7 @@
         "Pastel Lavender / Lilac"
       ],
       "fabric": "100% Breathable Pure Cotton",
-      "stock": 50,
+      "stock": 49,
       "rating": 4.9,
       "reviewsCount": 31,
       "isNewArrival": true,
@@ -2196,7 +2196,7 @@
       "sleeves": "3/4th Sleeves",
       "fit": "Relaxed Straight Fit",
       "fabric": "100% Pure Fine Cotton",
-      "stock": 55,
+      "stock": 54,
       "rating": 4.9,
       "reviewsCount": 36,
       "isNewArrival": true,
@@ -4445,6 +4445,329 @@
   ],
   "orders": [
     {
+      "id": "LUX-20260816-217963",
+      "customerName": "Sanju Meena",
+      "email": "customer@luxue.com",
+      "phone": "9257539776",
+      "shippingAddress": {
+        "fullName": "Sanju Meena",
+        "mobile": "9257539776",
+        "email": "",
+        "house": "Vgddujb",
+        "street": "sanjumeena9865@gmail.com",
+        "area": "",
+        "landmark": "Chjjfd",
+        "city": "Niwai",
+        "state": "Rajasthan",
+        "pin": "304021",
+        "country": "India",
+        "saveForFuture": true
+      },
+      "items": [
+        {
+          "productId": "lux-kurti-07-skyblue-floral",
+          "product": {
+            "id": "lux-kurti-07-skyblue-floral",
+            "name": "Serene Sky Blue Floral Vine Printed Cotton Kurti",
+            "shortDescription": "Serene Sky Blue Floral Vine Printed Cotton Kurti crafted from pure cotton with delicate botanical vines in contrasting pastel tones.",
+            "description": "Experience calming pastel style with this Serene Sky Blue Floral Vine Printed Cotton Kurti. Crafted from high quality breathable cotton, it features delicate floral vines in subtle contrast shades for a cooling, feminine everyday ensemble.\n\nNote: Product color may vary slightly due to photographic lighting or your screen/display settings.",
+            "category": "Cotton Kurtis",
+            "subcategory": "Floral Kurtis",
+            "tags": [
+              "Kurti",
+              "Women's Kurti",
+              "Ethnic Wear",
+              "Indian Wear",
+              "Fashion",
+              "Casual Wear",
+              "Sky Blue",
+              "Floral Vine",
+              "Cotton Kurti",
+              "Summer Edit"
+            ],
+            "price": 699,
+            "originalPrice": 1299,
+            "discountPercent": 46,
+            "bestPrice": 599,
+            "offerBadge": "SUMMER COOL",
+            "image": "https://i.ibb.co/C3qpdg2X/357-7191a18f-c041-4536-9047-75d00d8f57f1.jpg",
+            "gallery": [
+              "https://i.ibb.co/C3qpdg2X/357-7191a18f-c041-4536-9047-75d00d8f57f1.jpg",
+              "https://i.ibb.co/dwTygg9w/358-8f59dca7-5df9-4ab0-bb70-166efcedeeec.jpg",
+              "https://i.ibb.co/7xnySkSd/359-1d99781b-5cfe-4e84-a836-c8d399a7a5e7.jpg",
+              "https://i.ibb.co/Xfj1RGpF/360-b85859e7-d447-4a01-b9a4-23569bad2fad.jpg",
+              "https://i.ibb.co/7JYcFrQ9/361-ca5965b2-85bd-4f3b-a0c6-c363feb4e1ec.jpg",
+              "https://i.ibb.co/FqbSRvcH/362-9d74e4f2-55bc-4483-ab8f-13f17745b678.jpg",
+              "https://i.ibb.co/Jj7BDTq4/363-6cad5804-cee0-4dde-bca2-d8e3a4efbd37.jpg"
+            ],
+            "sizes": [
+              "S",
+              "M",
+              "L",
+              "XL",
+              "XXL"
+            ],
+            "colors": [
+              "Sky Blue"
+            ],
+            "color": "Sky Blue & White",
+            "pattern": "Delicate Floral Vine Block Print",
+            "style": "Classic Straight Kurti",
+            "neck": "Round Neck with Notch",
+            "sleeves": "3/4th Sleeves",
+            "fit": "Relaxed Straight Fit",
+            "fabric": "100% Pure Fine Cotton",
+            "stock": 54,
+            "rating": 4.9,
+            "reviewsCount": 36,
+            "isNewArrival": true,
+            "isBestSeller": true,
+            "isTrending": true,
+            "isFeatured": true,
+            "isRakhiGiftEligible": true,
+            "occasion": "Summer Outings, Daily Wear, Brunch & Casual Workdays",
+            "highlights": [
+              "Soothing pastel sky-blue hue",
+              "100% pure fine cotton with maximum breathability",
+              "Graceful floral vine prints",
+              "Versatile pairing with white trousers or jeans"
+            ],
+            "slug": "serene-sky-blue-floral-vine-printed-cotton-kurti",
+            "seoTitle": "Sky Blue Floral Vine Cotton Kurti - Women's Ethnic Wear",
+            "seoDescription": "Shop our Serene Sky Blue Floral Vine Printed Cotton Kurti at ₹699. Pure cotton cooling comfort for your daily wardrobe.",
+            "seoKeywords": [
+              "sky blue kurti",
+              "cotton floral kurti",
+              "summer kurti",
+              "women ethnic top",
+              "printed straight kurti"
+            ],
+            "status": "published",
+            "visibility": "online",
+            "sku": "LUX-KRT-07",
+            "createdAt": "2026-08-13T22:06:00.000Z"
+          },
+          "selectedSize": "L",
+          "selectedColor": "Sky Blue",
+          "quantity": 1
+        },
+        {
+          "productId": "lux-coll-05-pastel-lavender-vine",
+          "product": {
+            "id": "lux-coll-05-pastel-lavender-vine",
+            "name": "Pastel Lavender Ethnic Vine Pure Cotton Kurti",
+            "shortDescription": "Enchanting Pastel Lavender Ethnic Vine Pure Cotton Kurti with serene floral sprays and pastel harmony.",
+            "description": "Imbued with delicate pastel charm, this Pastel Lavender Ethnic Vine Pure Cotton Kurti is a summer staple. The soothing lilac base is highlighted by intricate floral sprays and artisanally printed borders that impart timeless elegance.\n\nNote: Product color may vary slightly due to photographic lighting or your screen/display settings.",
+            "category": "Kurtis",
+            "subcategory": "Everyday Kurtis",
+            "tags": [
+              "Kurti",
+              "Women's Kurti",
+              "Ethnic Wear",
+              "Indian Wear",
+              "Fashion",
+              "Lavender Kurti",
+              "Pastel Kurti",
+              "Kurtis"
+            ],
+            "price": 699,
+            "originalPrice": 1349,
+            "discountPercent": 48,
+            "bestPrice": 599,
+            "offerBadge": "SUMMER FAVORITE",
+            "image": "https://i.ibb.co/5hksjWKY/85-eec2afb0-016b-485a-9b43-c71562410154.jpg",
+            "gallery": [
+              "https://i.ibb.co/5hksjWKY/85-eec2afb0-016b-485a-9b43-c71562410154.jpg",
+              "https://i.ibb.co/1GXC1ck1/86-caa047f7-c473-4482-b14f-0dc9c74c10aa.jpg",
+              "https://i.ibb.co/NgKMRRdL/87-cdb09977-7f5b-4c89-b652-56e4ca2b0562.jpg",
+              "https://i.ibb.co/PzCh9c15/88-e5d82e7c-9a94-4e98-b858-8756c0be18a0.jpg",
+              "https://i.ibb.co/TxtkpcDf/89-bcec1ff3-ffad-44bb-9982-fae13cfa2e87.jpg",
+              "https://i.ibb.co/gMZG4xYN/90-7ed46469-d64f-40d4-8bb8-cc013bdb3d79.jpg",
+              "https://i.ibb.co/x8HQbDMH/91-7359fecc-80c6-45d4-83a3-f1b7b16b76e3.jpg"
+            ],
+            "sizes": [
+              "S",
+              "M",
+              "L",
+              "XL",
+              "XXL"
+            ],
+            "colors": [
+              "Pastel Lavender / Lilac"
+            ],
+            "fabric": "100% Breathable Pure Cotton",
+            "stock": 49,
+            "rating": 4.9,
+            "reviewsCount": 31,
+            "isNewArrival": true,
+            "isBestSeller": true,
+            "isTrending": true,
+            "isFeatured": true,
+            "isRakhiGiftEligible": true,
+            "color": "Lavender / Soft Purple",
+            "pattern": "Delicate Floral Vine Jaal",
+            "style": "Straight Classic Kurti",
+            "neck": "Round Neck with Keyhole Detail",
+            "sleeves": "3/4th Sleeves",
+            "fit": "Tailored Comfort Fit",
+            "occasion": "Daily Workwear, College, Afternoon Outings & Casual Meetups",
+            "highlights": [
+              "Trendy pastel lavender palette with intricate vines",
+              "Cool, moisture-wicking 100% cotton fabric",
+              "Reinforced side stitching with comfortable side slits",
+              "Versatile pairing with white or off-white bottoms"
+            ],
+            "slug": "pastel-lavender-ethnic-vine-pure-cotton-kurti",
+            "seoTitle": "Pastel Lavender Ethnic Vine Cotton Kurti - Women's Ethnic Wear",
+            "seoDescription": "Shop Pastel Lavender Ethnic Vine Pure Cotton Kurti online at ₹699. Premium pure cotton, stylish everyday ethnic fashion.",
+            "seoKeywords": [
+              "lavender kurti",
+              "lilac kurti",
+              "pastel cotton kurti",
+              "women kurtis",
+              "ethnic wear online"
+            ],
+            "status": "published",
+            "visibility": "online",
+            "sku": "LUX-COL-05",
+            "createdAt": "2026-08-13T23:04:00.000Z"
+          },
+          "selectedSize": "S",
+          "selectedColor": "Pastel Lavender / Lilac",
+          "quantity": 1
+        },
+        {
+          "productId": "lux-coll-01-dusty-rose-floral",
+          "product": {
+            "id": "lux-coll-01-dusty-rose-floral",
+            "name": "Dusty Rose Floral Printed Straight Cotton Kurti",
+            "shortDescription": "Charming Dusty Rose Floral Printed Straight Cotton Kurti with delicate vine prints and soothing tones on breathable pure cotton.",
+            "description": "Embrace timeless feminine grace with our Dusty Rose Floral Printed Straight Cotton Kurti. Styled with gentle botanical vines and intricate paisley borders, this premium pure cotton kurti ensures cool, all-day comfort. Ideal for everyday elegance, office styling, and casual festive get-togethers.\n\nNote: Product color may vary slightly due to photographic lighting or your screen/display settings.",
+            "category": "Kurtis",
+            "subcategory": "Printed Kurtis",
+            "tags": [
+              "Kurti",
+              "Women's Kurti",
+              "Ethnic Wear",
+              "Indian Wear",
+              "Fashion",
+              "Daily Wear",
+              "Pink Kurti",
+              "Floral Print",
+              "Kurtis"
+            ],
+            "price": 699,
+            "originalPrice": 1399,
+            "discountPercent": 50,
+            "bestPrice": 599,
+            "offerBadge": "BESTSELLER",
+            "image": "https://i.ibb.co/GvhV3bnd/463.jpg",
+            "gallery": [
+              "https://i.ibb.co/GvhV3bnd/463.jpg",
+              "https://i.ibb.co/0RdFGRm0/464.jpg",
+              "https://i.ibb.co/zT6pN96L/465.jpg",
+              "https://i.ibb.co/YMLPc2x/466.jpg",
+              "https://i.ibb.co/KpMxbHSm/467.jpg",
+              "https://i.ibb.co/TMyY5VZX/469.jpg",
+              "https://i.ibb.co/rfQ9sGLk/468.jpg"
+            ],
+            "sizes": [
+              "S",
+              "M",
+              "L",
+              "XL",
+              "XXL"
+            ],
+            "colors": [
+              "Dusty Rose / Pink"
+            ],
+            "fabric": "100% Breathable Soft Cotton",
+            "stock": 49,
+            "rating": 4.9,
+            "reviewsCount": 29,
+            "isNewArrival": true,
+            "isBestSeller": true,
+            "isTrending": true,
+            "isFeatured": true,
+            "isRakhiGiftEligible": true,
+            "color": "Dusty Rose / Blush Pink",
+            "pattern": "Botanical Floral & Vine Print",
+            "style": "Straight Cut Everyday Kurti",
+            "neck": "Mandarin Collar with Notch",
+            "sleeves": "3/4th Sleeves with Contrast Border",
+            "fit": "Regular Comfort Fit",
+            "occasion": "Office Wear, Daily College, Casual Outings & Festive Gatherings",
+            "highlights": [
+              "Pure 100% soft breathable cotton fabric",
+              "Soothing dusty rose pink palette with vine prints",
+              "Side slits for effortless movement",
+              "Intricate contrast border detailing along cuffs and hem",
+              "Machine washable and colorfast"
+            ],
+            "slug": "dusty-rose-floral-printed-straight-cotton-kurti",
+            "seoTitle": "Dusty Rose Floral Printed Straight Kurti - Women's Ethnic Wear",
+            "seoDescription": "Shop our Dusty Rose Floral Printed Straight Cotton Kurti for women at ₹699. Made from 100% pure cotton, perfect for summer daily & office wear.",
+            "seoKeywords": [
+              "dusty rose kurti",
+              "pink floral kurti",
+              "cotton straight kurti",
+              "kurtis for women",
+              "indian ethnic wear"
+            ],
+            "status": "published",
+            "visibility": "online",
+            "sku": "LUX-COL-01",
+            "createdAt": "2026-08-13T23:00:00.000Z"
+          },
+          "selectedSize": "S",
+          "selectedColor": "Dusty Rose / Pink",
+          "quantity": 1
+        }
+      ],
+      "freeGiftItem": null,
+      "subtotal": 2097,
+      "discount": 0,
+      "shippingFee": 0,
+      "totalAmount": 2097,
+      "paymentMethod": "UPI",
+      "paymentStatus": "Pending",
+      "orderStatus": "Pending",
+      "createdAt": "2026-08-16T14:07:09.706Z",
+      "paymentSessionExpiresAt": "2026-08-16T14:17:09.706Z",
+      "trackingHistory": [
+        {
+          "status": "Pending",
+          "date": "16 Aug 2026, 02:07 pm",
+          "completed": true
+        },
+        {
+          "status": "Confirmed",
+          "date": "16 Aug 2026, 02:07 pm",
+          "completed": false
+        },
+        {
+          "status": "Packed",
+          "date": "Estimated Tomorrow",
+          "completed": false
+        },
+        {
+          "status": "Shipped",
+          "date": "In 2 Days",
+          "completed": false
+        },
+        {
+          "status": "Out for Delivery",
+          "date": "In 3 Days",
+          "completed": false
+        },
+        {
+          "status": "Delivered",
+          "date": "In 4 Days",
+          "completed": false
+        }
+      ]
+    },
+    {
       "id": "LX-880291",
       "customerName": "Ananya Sharma",
       "email": "ananya.s@gmail.com",
@@ -4775,14 +5098,24 @@
     "pinCode": "201303",
     "country": "India",
     "gstin": "09AAMFE0502D1ZX",
-    "merchantUpiId": "luxuefashion@icici",
+    "merchantUpiId": "testone@upi",
     "merchantName": "LUXUE FASHION ONLINE",
     "paymentSettings": {
       "upiEnabled": true,
       "cardEnabled": true,
       "codEnabled": false,
       "merchantName": "LUXUE FASHION ONLINE",
-      "merchantUpiId": "luxuefashion@icici"
+      "merchantUpiId": "testone@upi",
+      "lastUpdated": "2026-08-16T14:17:08.770Z",
+      "lastUpdatedBy": "Admin"
     }
+  },
+  "paymentSettings": {
+    "upiId": "testone@upi",
+    "businessName": "LUXUE FASHION ONLINE",
+    "upiEnabled": true,
+    "cardEnabled": true,
+    "updatedAt": "2026-08-16T14:17:08.770Z",
+    "updatedBy": "Admin"
   }
 }

@@ -23,8 +23,8 @@ import { PaymentGatewaySettings } from '../../types';
 export const AdminPaymentSettings: React.FC = () => {
   const { settings, updatePaymentSettings } = useShop();
 
-  // Active Settings State with safe fallback to localStorage
-  const activeUpiId = (() => {
+  // Local active state synced with server
+  const [activeUpiId, setActiveUpiId] = useState<string>(() => {
     try {
       const saved = localStorage.getItem('admin_upi_settings');
       if (saved) {
@@ -32,10 +32,10 @@ export const AdminPaymentSettings: React.FC = () => {
         if (parsed.merchantUpiId || parsed.upiId) return parsed.merchantUpiId || parsed.upiId;
       }
     } catch {}
-    return settings.merchantUpiId || settings.paymentSettings?.merchantUpiId || 'luxuefashion@icici';
-  })();
+    return settings.merchantUpiId || settings.paymentSettings?.merchantUpiId || '';
+  });
 
-  const activeMerchantName = (() => {
+  const [activeMerchantName, setActiveMerchantName] = useState<string>(() => {
     try {
       const saved = localStorage.getItem('admin_upi_settings');
       if (saved) {
@@ -44,9 +44,9 @@ export const AdminPaymentSettings: React.FC = () => {
       }
     } catch {}
     return settings.merchantName || settings.paymentSettings?.merchantName || settings.storeName || 'LUXUE FASHION ONLINE';
-  })();
+  });
 
-  const activeUpiEnabled = (() => {
+  const [activeUpiEnabled, setActiveUpiEnabled] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem('admin_upi_settings');
       if (saved) {
@@ -55,9 +55,9 @@ export const AdminPaymentSettings: React.FC = () => {
       }
     } catch {}
     return settings.paymentSettings?.upiEnabled ?? true;
-  })();
+  });
 
-  const activeCardEnabled = (() => {
+  const [activeCardEnabled, setActiveCardEnabled] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem('admin_upi_settings');
       if (saved) {
@@ -66,10 +66,12 @@ export const AdminPaymentSettings: React.FC = () => {
       }
     } catch {}
     return settings.paymentSettings?.cardEnabled ?? true;
-  })();
+  });
 
-  const lastUpdatedIso =
-    settings.paymentSettings?.lastUpdated || new Date().toISOString();
+  const [lastUpdatedIso, setLastUpdatedIso] = useState<string>(() => {
+    return settings.paymentSettings?.lastUpdated || new Date().toISOString();
+  });
+
   const lastUpdatedBy =
     settings.paymentSettings?.lastUpdatedBy || 'LUXUE Superadmin';
 
@@ -79,13 +81,67 @@ export const AdminPaymentSettings: React.FC = () => {
   const [isUpiEnabled, setIsUpiEnabled] = useState(activeUpiEnabled);
   const [isCardEnabled, setIsCardEnabled] = useState(activeCardEnabled);
 
-  // Sync when settings change
+  // Fetch directly from server database on mount
   useEffect(() => {
-    setUpiIdInput(activeUpiId);
-    setMerchantNameInput(activeMerchantName);
-    setIsUpiEnabled(activeUpiEnabled);
-    setIsCardEnabled(activeCardEnabled);
-  }, [activeUpiId, activeMerchantName, activeUpiEnabled, activeCardEnabled]);
+    const fetchLatestServerSettings = async () => {
+      try {
+        const res = await fetch(`/api/payment-config?t=${Date.now()}`, {
+          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.merchantUpiId !== undefined) {
+            const upi = data.merchantUpiId || data.upiId || '';
+            const name = data.merchantName || data.businessName || 'LUXUE FASHION ONLINE';
+            setActiveUpiId(upi);
+            setUpiIdInput(upi);
+            setActiveMerchantName(name);
+            setMerchantNameInput(name);
+            if (typeof data.upiEnabled === 'boolean') {
+              setActiveUpiEnabled(data.upiEnabled);
+              setIsUpiEnabled(data.upiEnabled);
+            }
+            if (typeof data.cardEnabled === 'boolean') {
+              setActiveCardEnabled(data.cardEnabled);
+              setIsCardEnabled(data.cardEnabled);
+            }
+            if (data.lastUpdated) {
+              setLastUpdatedIso(data.lastUpdated);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to load server payment settings:', err);
+      }
+    };
+
+    fetchLatestServerSettings();
+  }, []);
+
+  // Sync when settings prop changes
+  useEffect(() => {
+    const currentUpi = settings.merchantUpiId || settings.paymentSettings?.merchantUpiId;
+    if (currentUpi) {
+      setActiveUpiId(currentUpi);
+      setUpiIdInput(currentUpi);
+    }
+    const currentName = settings.merchantName || settings.paymentSettings?.merchantName;
+    if (currentName) {
+      setActiveMerchantName(currentName);
+      setMerchantNameInput(currentName);
+    }
+    if (settings.paymentSettings?.upiEnabled !== undefined) {
+      setActiveUpiEnabled(settings.paymentSettings.upiEnabled);
+      setIsUpiEnabled(settings.paymentSettings.upiEnabled);
+    }
+    if (settings.paymentSettings?.cardEnabled !== undefined) {
+      setActiveCardEnabled(settings.paymentSettings.cardEnabled);
+      setIsCardEnabled(settings.paymentSettings.cardEnabled);
+    }
+    if (settings.paymentSettings?.lastUpdated) {
+      setLastUpdatedIso(settings.paymentSettings.lastUpdated);
+    }
+  }, [settings]);
 
   // Validation State
   const upiRegex = /^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z0-9.\-_]{2,64}$/;
@@ -122,6 +178,11 @@ export const AdminPaymentSettings: React.FC = () => {
     const targetName = merchantNameInput.trim() || activeMerchantName;
     const numAmount = parseFloat(testAmount) || 10;
 
+    if (!targetUpi) {
+      setTestQrDataUrl(null);
+      return;
+    }
+
     const params = new URLSearchParams({
       pa: targetUpi,
       pn: targetName,
@@ -146,16 +207,27 @@ export const AdminPaymentSettings: React.FC = () => {
 
   const handleCopyTestUpi = () => {
     const targetUpi = upiIdInput.trim() || activeUpiId;
+    if (!targetUpi) return;
     navigator.clipboard?.writeText(targetUpi);
     setCopiedTestUpi(true);
     setTimeout(() => setCopiedTestUpi(false), 2000);
   };
 
   const handleCopyActiveUpi = () => {
+    if (!activeUpiId) return;
     navigator.clipboard?.writeText(activeUpiId);
     setCopiedActiveUpi(true);
     setTimeout(() => setCopiedActiveUpi(false), 2000);
   };
+
+  // Common UPI handle suggestions
+  const upiSuggestions = [
+    'testone@upi',
+    'testtwo@upi',
+    'store@icici',
+    'merchant@okhdfcbank',
+    'business@paytm',
+  ];
 
   // Submit Handler
   const handleSavePaymentSettings = async (e: React.FormEvent) => {
@@ -171,64 +243,77 @@ export const AdminPaymentSettings: React.FC = () => {
       return;
     }
 
-    // 2. VPA Format Validation (checking standard handles like @fam, @icici, @upi, @paytm, etc.)
+    // 2. VPA Format Validation
     if (!upiRegex.test(cleanUpi)) {
       setFeedbackMessage({
         type: 'error',
-        text: 'Invalid UPI ID format. Please use a valid VPA handle (e.g., yourname@upi, store@icici, name@fam).',
+        text: 'Invalid UPI ID format. Please use a valid VPA handle (e.g., testone@upi, store@icici, mobile@paytm).',
       });
       return;
     }
 
     setIsSaving(true);
     try {
-      // 3. Save directly to state and localStorage (zero latency, static hosting safe)
+      const token = localStorage.getItem('luxue_admin_token') || 'luxue-admin-jwt-token-2026';
       const result = await updatePaymentSettings({
+        upiId: cleanUpi,
         merchantUpiId: cleanUpi,
+        businessName: cleanMerchant,
         merchantName: cleanMerchant,
         upiEnabled: isUpiEnabled,
         cardEnabled: isCardEnabled,
       });
 
-      if (result.success) {
-        setFeedbackMessage({
-          type: 'success',
-          text: 'UPI Configuration updated successfully!',
-        });
-      } else {
+      if (!result.success) {
         setFeedbackMessage({
           type: 'error',
-          text: result.message || 'Failed to update payment settings.',
+          text: result.message || 'Failed to save UPI settings. Please try again.',
         });
+        return;
       }
-    } catch {
-      // Guaranteed local fallback
-      localStorage.setItem('admin_upi_settings', JSON.stringify({
-        merchantUpiId: cleanUpi,
-        upiId: cleanUpi,
-        merchantName: cleanMerchant,
-        upiEnabled: isUpiEnabled,
-        cardEnabled: isCardEnabled,
-        lastUpdated: new Date().toISOString(),
-      }));
+
+      // 3. Database Read-Back Verification to ensure state is confirmed on server
+      const verifyRes = await fetch(`/api/admin/payment-settings?t=${Date.now()}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+        },
+      });
+
+      if (!verifyRes.ok) {
+        throw new Error('Could not verify database state.');
+      }
+
+      const verifyData = await verifyRes.json();
+      const confirmedUpi = verifyData.paymentSettings?.upiId || verifyData.upiId || verifyData.merchantUpiId;
+
+      if (confirmedUpi !== cleanUpi) {
+        throw new Error(`Database verification mismatch. Server returned: ${confirmedUpi}`);
+      }
+
+      // Update active local state only after DB confirmation
+      setActiveUpiId(cleanUpi);
+      setUpiIdInput(cleanUpi);
+      setActiveMerchantName(cleanMerchant);
+      setMerchantNameInput(cleanMerchant);
+      setActiveUpiEnabled(isUpiEnabled);
+      setActiveCardEnabled(isCardEnabled);
+      setLastUpdatedIso(new Date().toISOString());
 
       setFeedbackMessage({
         type: 'success',
-        text: 'UPI Configuration updated successfully!',
+        text: 'UPI Settings Saved Successfully',
+      });
+    } catch (err: any) {
+      console.error('Save verification error:', err);
+      setFeedbackMessage({
+        type: 'error',
+        text: 'Failed to save UPI settings. Please try again.',
       });
     } finally {
       setIsSaving(false);
     }
   };
-
-  // Common UPI handle suggestions
-  const upiSuggestions = [
-    'luxuefashion@icici',
-    'luxuefashion@okhdfcbank',
-    'luxuefashion@okaxis',
-    'luxuefashion@paytm',
-    '9876543210@upi',
-  ];
 
   return (
     <div className="space-y-8 max-w-5xl">
@@ -392,7 +477,7 @@ export const AdminPaymentSettings: React.FC = () => {
               </div>
 
               <p className="text-[11px] text-[#C2B2A3]">
-                Enter any valid Indian UPI ID / VPA. Example formats: <code className="text-[#DFBA67]">yourname@upi</code>, <code className="text-[#DFBA67]">luxuefashion@icici</code>, <code className="text-[#DFBA67]">9876543210@paytm</code>.
+                Enter any valid Indian UPI ID / VPA. Example formats: <code className="text-[#DFBA67]">testone@upi</code>, <code className="text-[#DFBA67]">store@icici</code>, <code className="text-[#DFBA67]">merchant@paytm</code>.
               </p>
 
               {/* Suggestions Chips */}

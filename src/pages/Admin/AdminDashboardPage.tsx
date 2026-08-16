@@ -1523,7 +1523,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ activeSu
                     <input
                       type="text"
                       required
-                      value={settingsForm.paymentSettings?.merchantName || settingsForm.merchantName || settingsForm.storeName}
+                      value={settingsForm.paymentSettings?.merchantName || settingsForm.merchantName || settingsForm.storeName || ''}
                       onChange={e => {
                         const val = e.target.value;
                         setSettingsForm({
@@ -1531,12 +1531,11 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ activeSu
                           merchantName: val,
                           paymentSettings: {
                             ...(settingsForm.paymentSettings || {
-                              merchantUpiId: 'luxuefashion@icici',
-                              merchantName: 'LUXUE FASHION ONLINE',
-                              enableUpi: true,
-                              enableCard: true,
-                              enableCod: false,
-                              codDisabledReason: 'Currently unavailable — prepaid orders only',
+                              merchantUpiId: '',
+                              merchantName: settingsForm.storeName || 'LUXUE FASHION ONLINE',
+                              upiEnabled: true,
+                              cardEnabled: true,
+                              codEnabled: false,
                             }),
                             merchantName: val,
                           },
@@ -1551,7 +1550,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ activeSu
                     <input
                       type="text"
                       required
-                      value={settingsForm.paymentSettings?.merchantUpiId || settingsForm.merchantUpiId || 'luxuefashion@icici'}
+                      value={settingsForm.paymentSettings?.merchantUpiId || settingsForm.merchantUpiId || ''}
                       onChange={e => {
                         const val = e.target.value;
                         setSettingsForm({
@@ -1559,12 +1558,11 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ activeSu
                           merchantUpiId: val,
                           paymentSettings: {
                             ...(settingsForm.paymentSettings || {
-                              merchantUpiId: 'luxuefashion@icici',
-                              merchantName: 'LUXUE FASHION ONLINE',
-                              enableUpi: true,
-                              enableCard: true,
-                              enableCod: false,
-                              codDisabledReason: 'Currently unavailable — prepaid orders only',
+                              merchantUpiId: '',
+                              merchantName: settingsForm.storeName || 'LUXUE FASHION ONLINE',
+                              upiEnabled: true,
+                              cardEnabled: true,
+                              codEnabled: false,
                             }),
                             merchantUpiId: val,
                           },
@@ -1580,20 +1578,19 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ activeSu
                     <input
                       type="checkbox"
                       id="upiToggle"
-                      checked={settingsForm.paymentSettings?.enableUpi ?? true}
+                      checked={settingsForm.paymentSettings?.upiEnabled ?? true}
                       onChange={e =>
                         setSettingsForm({
                           ...settingsForm,
                           paymentSettings: {
                             ...(settingsForm.paymentSettings || {
-                              merchantUpiId: 'luxuefashion@icici',
-                              merchantName: 'LUXUE FASHION ONLINE',
-                              enableUpi: true,
-                              enableCard: true,
-                              enableCod: false,
-                              codDisabledReason: 'Currently unavailable — prepaid orders only',
+                              merchantUpiId: '',
+                              merchantName: settingsForm.storeName || 'LUXUE FASHION ONLINE',
+                              upiEnabled: true,
+                              cardEnabled: true,
+                              codEnabled: false,
                             }),
-                            enableUpi: e.target.checked,
+                            upiEnabled: e.target.checked,
                           },
                         })
                       }
@@ -1608,20 +1605,19 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ activeSu
                     <input
                       type="checkbox"
                       id="cardToggle"
-                      checked={settingsForm.paymentSettings?.enableCard ?? true}
+                      checked={settingsForm.paymentSettings?.cardEnabled ?? true}
                       onChange={e =>
                         setSettingsForm({
                           ...settingsForm,
                           paymentSettings: {
                             ...(settingsForm.paymentSettings || {
-                              merchantUpiId: 'luxuefashion@icici',
-                              merchantName: 'LUXUE FASHION ONLINE',
-                              enableUpi: true,
-                              enableCard: true,
-                              enableCod: false,
-                              codDisabledReason: 'Currently unavailable — prepaid orders only',
+                              merchantUpiId: '',
+                              merchantName: settingsForm.storeName || 'LUXUE FASHION ONLINE',
+                              upiEnabled: true,
+                              cardEnabled: true,
+                              codEnabled: false,
                             }),
-                            enableCard: e.target.checked,
+                            cardEnabled: e.target.checked,
                           },
                         })
                       }

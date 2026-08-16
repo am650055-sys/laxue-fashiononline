@@ -10,6 +10,7 @@ import {
   INITIAL_COUPONS,
   INITIAL_SAMPLE_ORDERS,
   INITIAL_SETTINGS,
+  INITIAL_PAYMENT_SETTINGS,
 } from './src/data/initialData.js';
 import {
   Product,
@@ -22,6 +23,7 @@ import {
   PaymentStatus,
   CartItem,
   StoreSettings,
+  PaymentSettingsRecord,
 } from './src/types.js';
 
 const app = express();
@@ -61,6 +63,7 @@ interface DatabaseSchema {
   coupons: Coupon[];
   orders: Order[];
   settings: StoreSettings;
+  paymentSettings: PaymentSettingsRecord;
 }
 
 // Initial DB state
@@ -72,6 +75,7 @@ let db: DatabaseSchema = {
   coupons: INITIAL_COUPONS,
   orders: INITIAL_SAMPLE_ORDERS,
   settings: INITIAL_SETTINGS,
+  paymentSettings: INITIAL_PAYMENT_SETTINGS,
 };
 
 // Helper: Ensure Data Dir & Load/Save JSON DB
@@ -85,7 +89,43 @@ function initDatabase() {
       const loaded = JSON.parse(data);
       db = { ...db, ...loaded };
       db.settings = { ...INITIAL_SETTINGS, ...(loaded.settings || {}) };
-      console.log('Database loaded successfully from disk.');
+
+      // Initialize or preserve single persistent paymentSettings record
+      if (loaded.paymentSettings && typeof loaded.paymentSettings === 'object') {
+        db.paymentSettings = {
+          upiId: loaded.paymentSettings.upiId || loaded.paymentSettings.merchantUpiId || 'testone@upi',
+          businessName: loaded.paymentSettings.businessName || loaded.paymentSettings.merchantName || 'LUXUE FASHION ONLINE',
+          upiEnabled: loaded.paymentSettings.upiEnabled !== false,
+          cardEnabled: loaded.paymentSettings.cardEnabled !== false,
+          updatedAt: loaded.paymentSettings.updatedAt || loaded.paymentSettings.lastUpdated || new Date().toISOString(),
+          updatedBy: loaded.paymentSettings.updatedBy || loaded.paymentSettings.lastUpdatedBy || 'Admin',
+        };
+      } else {
+        const existingUpi = db.settings?.merchantUpiId || db.settings?.paymentSettings?.merchantUpiId || 'testone@upi';
+        const existingName = db.settings?.merchantName || db.settings?.paymentSettings?.merchantName || db.settings?.storeName || 'LUXUE FASHION ONLINE';
+        db.paymentSettings = {
+          upiId: existingUpi,
+          businessName: existingName,
+          upiEnabled: db.settings?.paymentSettings?.upiEnabled !== false,
+          cardEnabled: db.settings?.paymentSettings?.cardEnabled !== false,
+          updatedAt: db.settings?.paymentSettings?.lastUpdated || new Date().toISOString(),
+          updatedBy: 'System Initializer',
+        };
+      }
+
+      // Sync db.settings for store-wide consistency
+      if (db.settings) {
+        db.settings.merchantUpiId = db.paymentSettings.upiId;
+        db.settings.merchantName = db.paymentSettings.businessName;
+        if (db.settings.paymentSettings) {
+          db.settings.paymentSettings.merchantUpiId = db.paymentSettings.upiId;
+          db.settings.paymentSettings.merchantName = db.paymentSettings.businessName;
+          db.settings.paymentSettings.upiEnabled = db.paymentSettings.upiEnabled;
+          db.settings.paymentSettings.cardEnabled = db.paymentSettings.cardEnabled !== false;
+        }
+      }
+
+      console.log(`Database loaded successfully. Active UPI ID: ${db.paymentSettings.upiId}`);
     } else {
       saveDatabase();
       console.log('Database initialized with seed data.');
@@ -95,11 +135,13 @@ function initDatabase() {
   }
 }
 
-function saveDatabase() {
+function saveDatabase(): boolean {
   try {
     fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf-8');
+    return true;
   } catch (err) {
     console.error('Error saving database:', err);
+    return false;
   }
 }
 
@@ -901,111 +943,169 @@ app.get('/api/admin/analytics', requireAdminAuth, (req: Request, res: Response) 
 });
 
 // 10. STORE SETTINGS & PAYMENT CONFIGURATION
-// Public endpoint for customer storefront
+// Public endpoint for customer storefront - ALWAYS FRESH, NO CACHE
 app.get('/api/payment-config', (req: Request, res: Response) => {
-  const settings = db.settings || INITIAL_SETTINGS;
-  const paySettings = settings.paymentSettings || INITIAL_SETTINGS.paymentSettings;
-  const merchantUpiId = settings.merchantUpiId || paySettings?.merchantUpiId || 'luxuefashion@icici';
-  const merchantName = settings.merchantName || paySettings?.merchantName || 'LUXUE FASHION ONLINE';
-  const upiEnabled = paySettings?.upiEnabled !== undefined ? Boolean(paySettings.upiEnabled) : true;
-  const cardEnabled = paySettings?.cardEnabled !== undefined ? Boolean(paySettings.cardEnabled) : true;
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+
+  const pay = db.paymentSettings || {
+    upiId: db.settings?.merchantUpiId || 'testone@upi',
+    businessName: db.settings?.merchantName || db.settings?.storeName || 'LUXUE FASHION ONLINE',
+    upiEnabled: true,
+    cardEnabled: true,
+    updatedAt: new Date().toISOString(),
+    updatedBy: 'System',
+  };
 
   res.json({
-    upiEnabled,
-    merchantUpiId,
-    merchantName,
-    cardEnabled,
+    upiId: pay.upiId,
+    merchantUpiId: pay.upiId,
+    businessName: pay.businessName,
+    merchantName: pay.businessName,
+    upiEnabled: pay.upiEnabled !== false,
+    cardEnabled: pay.cardEnabled !== false,
     codEnabled: false,
-    lastUpdated: paySettings?.lastUpdated || new Date().toISOString(),
+    updatedAt: pay.updatedAt,
+    lastUpdated: pay.updatedAt,
   });
 });
 
 app.get('/api/settings', (req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   res.json(db.settings || INITIAL_SETTINGS);
 });
 
-// Admin UPI & Payment Settings Fetch
+// Admin UPI & Payment Settings Fetch (Single Document from Database)
 app.get('/api/admin/payment-settings', requireAdminAuth, (req: Request, res: Response) => {
-  const settings = db.settings || INITIAL_SETTINGS;
-  const paySettings = settings.paymentSettings || {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+
+  const pay = db.paymentSettings || {
+    upiId: db.settings?.merchantUpiId || 'testone@upi',
+    businessName: db.settings?.merchantName || db.settings?.storeName || 'LUXUE FASHION ONLINE',
     upiEnabled: true,
     cardEnabled: true,
-    codEnabled: false,
-    merchantName: settings.storeName || 'LUXUE FASHION ONLINE',
-    merchantUpiId: 'luxuefashion@icici',
-    lastUpdated: new Date().toISOString(),
-    lastUpdatedBy: 'Admin',
+    updatedAt: new Date().toISOString(),
+    updatedBy: 'Admin',
   };
 
   res.json({
-    upiEnabled: paySettings.upiEnabled,
-    merchantUpiId: settings.merchantUpiId || paySettings.merchantUpiId || 'luxuefashion@icici',
-    merchantName: settings.merchantName || paySettings.merchantName || settings.storeName || 'LUXUE FASHION ONLINE',
-    cardEnabled: paySettings.cardEnabled,
-    codEnabled: false,
-    lastUpdated: paySettings.lastUpdated || new Date().toISOString(),
-    lastUpdatedBy: paySettings.lastUpdatedBy || 'LUXUE Admin',
-    testModeEnabled: Boolean(paySettings.testModeEnabled),
+    success: true,
+    paymentSettings: {
+      upiId: pay.upiId,
+      merchantUpiId: pay.upiId,
+      businessName: pay.businessName,
+      merchantName: pay.businessName,
+      upiEnabled: pay.upiEnabled !== false,
+      cardEnabled: pay.cardEnabled !== false,
+      codEnabled: false,
+      updatedAt: pay.updatedAt,
+      lastUpdated: pay.updatedAt,
+      updatedBy: pay.updatedBy || 'Admin',
+    },
+    // Also provide root keys for seamless backward compatibility
+    upiId: pay.upiId,
+    merchantUpiId: pay.upiId,
+    businessName: pay.businessName,
+    merchantName: pay.businessName,
+    upiEnabled: pay.upiEnabled !== false,
+    cardEnabled: pay.cardEnabled !== false,
+    updatedAt: pay.updatedAt,
+    lastUpdated: pay.updatedAt,
   });
 });
 
-// Admin UPI & Payment Settings Update (Strict Validation & Sanitization)
+// Admin UPI & Payment Settings Update (CRUD: Update single document + physical database write + immediate read-back verification)
 app.post('/api/admin/payment-settings', requireAdminAuth, (req: Request, res: Response) => {
   try {
-    const { merchantUpiId, merchantName, upiEnabled, cardEnabled, testModeEnabled, adminEmail } = req.body;
+    const { upiId, merchantUpiId, businessName, merchantName, upiEnabled, cardEnabled, adminEmail } = req.body;
 
-    if (!merchantUpiId || typeof merchantUpiId !== 'string') {
-      return res.status(400).json({ error: 'UPI ID is required' });
+    const targetUpi = (upiId || merchantUpiId);
+    if (!targetUpi || typeof targetUpi !== 'string' || targetUpi.trim() === '') {
+      return res.status(400).json({ success: false, error: 'UPI ID is required' });
     }
 
-    const cleanUpiId = merchantUpiId.trim().toLowerCase();
+    const cleanUpiId = targetUpi.trim().toLowerCase();
     // Validate UPI ID format: username@bank / string@handle
     const upiRegex = /^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z0-9.\-_]{2,64}$/;
     if (!upiRegex.test(cleanUpiId)) {
       return res.status(400).json({
-        error: 'Invalid UPI ID format. A valid UPI ID must follow standard format like name@upi, yourstore@icici, mobile@paytm, etc.',
+        success: false,
+        error: 'Invalid UPI ID format. A valid UPI ID must follow standard format like testone@upi, yourname@upi, store@icici, etc.',
       });
     }
 
-    const cleanMerchantName = typeof merchantName === 'string' && merchantName.trim()
-      ? merchantName.trim().replace(/[<>]/g, '')
-      : (db.settings.storeName || 'LUXUE FASHION ONLINE');
+    const cleanBusinessName = typeof (businessName || merchantName) === 'string' && (businessName || merchantName).trim()
+      ? (businessName || merchantName).trim().replace(/[<>]/g, '')
+      : (db.settings?.storeName || 'LUXUE FASHION ONLINE');
 
     const isUpiOn = upiEnabled !== undefined ? Boolean(upiEnabled) : true;
     const isCardOn = cardEnabled !== undefined ? Boolean(cardEnabled) : true;
     const nowIso = new Date().toISOString();
+    const updatedBy = adminEmail || 'Admin';
 
-    const updatedPaymentSettings = {
+    // 1. Update single persistent record: paymentSettings
+    const updatedRecord: PaymentSettingsRecord = {
+      upiId: cleanUpiId,
+      businessName: cleanBusinessName,
       upiEnabled: isUpiOn,
       cardEnabled: isCardOn,
-      codEnabled: false,
-      merchantUpiId: cleanUpiId,
-      merchantName: cleanMerchantName,
-      lastUpdated: nowIso,
-      lastUpdatedBy: adminEmail || 'LUXUE Superadmin',
-      testModeEnabled: Boolean(testModeEnabled),
+      updatedAt: nowIso,
+      updatedBy: updatedBy,
     };
 
-    db.settings = {
-      ...db.settings,
-      merchantUpiId: cleanUpiId,
-      merchantName: cleanMerchantName,
-      paymentSettings: updatedPaymentSettings,
-    };
+    db.paymentSettings = updatedRecord;
 
-    saveDatabase();
+    // Sync db.settings for backward compatibility
+    if (db.settings) {
+      db.settings.merchantUpiId = cleanUpiId;
+      db.settings.merchantName = cleanBusinessName;
+      db.settings.paymentSettings = {
+        ...(db.settings.paymentSettings || {}),
+        merchantUpiId: cleanUpiId,
+        merchantName: cleanBusinessName,
+        upiEnabled: isUpiOn,
+        cardEnabled: isCardOn,
+        codEnabled: false,
+        lastUpdated: nowIso,
+        lastUpdatedBy: updatedBy,
+      };
+    }
 
-    console.log(`[PAYMENT SETTINGS UPDATED] New UPI ID: ${cleanUpiId} | Merchant: ${cleanMerchantName} | Status: ${isUpiOn ? 'ON' : 'OFF'}`);
+    // 2. Perform real database write to disk
+    const writeSuccess = saveDatabase();
+    if (!writeSuccess) {
+      throw new Error('Database write operation failed on disk.');
+    }
+
+    // 3. Perform immediate database read-back verification
+    if (fs.existsSync(DB_FILE)) {
+      const diskContent = fs.readFileSync(DB_FILE, 'utf-8');
+      const parsedDisk = JSON.parse(diskContent);
+      const readBackUpi = parsedDisk.paymentSettings?.upiId || parsedDisk.settings?.merchantUpiId;
+      if (readBackUpi !== cleanUpiId) {
+        throw new Error(`Database read-back verification mismatch: Disk has "${readBackUpi}", expected "${cleanUpiId}".`);
+      }
+    }
+
+    console.log(`[DATABASE WRITE & VERIFY OK] paymentSettings -> upiId: ${cleanUpiId} | businessName: ${cleanBusinessName} | at: ${nowIso}`);
 
     return res.json({
       success: true,
-      message: 'UPI payment settings updated successfully. Changes are now active for all customer checkouts.',
-      paymentSettings: updatedPaymentSettings,
+      message: 'UPI Settings Saved Successfully',
+      paymentSettings: updatedRecord,
       settings: db.settings,
     });
   } catch (err: any) {
-    console.error('[ERROR] Failed to update payment settings:', err);
-    return res.status(500).json({ error: 'Server error while saving payment settings: ' + (err.message || 'Unknown error') });
+    console.error('[ERROR] Failed to save payment settings to database:', err);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to save UPI settings. Please try again.',
+    });
   }
 });
 

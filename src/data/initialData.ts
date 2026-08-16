@@ -1,5 +1,14 @@
-import { Product, Category, Coupon, RakhiOfferConfig, BannerConfig, Order, StoreSettings } from '../types';
+import { Product, Category, Coupon, RakhiOfferConfig, BannerConfig, Order, StoreSettings, PaymentSettingsRecord } from '../types';
 import { COLLECTION_21_PRODUCTS } from './collectionProducts';
+
+export const INITIAL_PAYMENT_SETTINGS: PaymentSettingsRecord = {
+  upiId: 'testone@upi',
+  businessName: 'LUXUE FASHION ONLINE',
+  upiEnabled: true,
+  cardEnabled: true,
+  updatedAt: '2026-08-16T07:00:00.000Z',
+  updatedBy: 'Admin',
+};
 
 export const INITIAL_SETTINGS: StoreSettings = {
   whatsappNumber: '+919876543210',
@@ -13,16 +22,16 @@ export const INITIAL_SETTINGS: StoreSettings = {
   pinCode: '201303',
   country: 'India',
   gstin: '09AAMFE0502D1ZX',
-  merchantUpiId: 'luxuefashion@icici',
+  merchantUpiId: 'testone@upi',
   merchantName: 'LUXUE FASHION ONLINE',
   paymentSettings: {
     upiEnabled: true,
     cardEnabled: true,
     codEnabled: false,
     merchantName: 'LUXUE FASHION ONLINE',
-    merchantUpiId: 'luxuefashion@icici',
+    merchantUpiId: 'testone@upi',
     lastUpdated: '2026-08-16T12:00:00.000Z',
-    lastUpdatedBy: 'Admin (System Configuration)',
+    lastUpdatedBy: 'Admin',
   },
 };
 

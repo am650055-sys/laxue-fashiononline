@@ -176,14 +176,26 @@ export interface AdminUser {
   role: 'admin' | 'superadmin';
 }
 
+export interface PaymentSettingsRecord {
+  upiId: string;
+  businessName: string;
+  upiEnabled: boolean;
+  cardEnabled?: boolean;
+  updatedAt: string;
+  updatedBy?: string;
+}
+
 export interface PaymentGatewaySettings {
   upiEnabled: boolean; // Payment Status: ON/OFF
   merchantUpiId: string; // Dynamic UPI ID
   merchantName: string; // Business/Merchant Name
+  upiId?: string;
+  businessName?: string;
   cardEnabled: boolean;
   codEnabled: boolean; // permanently false
   lastUpdated?: string;
   lastUpdatedBy?: string;
+  updatedAt?: string;
   testModeEnabled?: boolean;
 }
 
