@@ -1,0 +1,47 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Products Collection
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if true;
+      allow delete: if true;
+    }
+
+    // Categories Collection
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Settings Collection (Store Config, Payment Settings, Rakhi Offer)
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Orders Collection
+    match /orders/{orderId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Coupons Collection
+    match /coupons/{couponId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Banners Collection
+    match /banners/{bannerId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Default deny all other collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,87 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "E-commerce catalog product entity",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "price": { "type": "number" },
+        "originalPrice": { "type": "number" },
+        "category": { "type": "string" },
+        "stock": { "type": "number" },
+        "status": { "type": "string", "enum": ["published", "draft"] },
+        "visibility": { "type": "string", "enum": ["online", "hidden"] },
+        "image": { "type": "string" },
+        "gallery": { "type": "array" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["name", "price"]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "Store product category",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "slug": { "type": "string" }
+      },
+      "required": ["name"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Customer order details and status",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "customerName": { "type": "string" },
+        "totalAmount": { "type": "number" },
+        "paymentMethod": { "type": "string" },
+        "paymentStatus": { "type": "string" },
+        "orderStatus": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["customerName", "totalAmount"]
+    },
+    "Setting": {
+      "title": "Setting",
+      "description": "Store configuration and payment settings",
+      "type": "object",
+      "properties": {
+        "upiId": { "type": "string" },
+        "businessName": { "type": "string" },
+        "upiEnabled": { "type": "boolean" },
+        "updatedAt": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Public clothing & fashion products collection"
+    },
+    "/categories/{categoryId}": {
+      "schema": "Category",
+      "description": "Store product categories"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Customer purchases and checkout records"
+    },
+    "/settings/{settingId}": {
+      "schema": "Setting",
+      "description": "Store global configuration, Rakhi offers, and UPI payment details"
+    },
+    "/coupons/{couponId}": {
+      "schema": "Setting",
+      "description": "Promotional coupon codes"
+    },
+    "/banners/{bannerId}": {
+      "schema": "Setting",
+      "description": "Marketing banners"
+    }
+  }
+}

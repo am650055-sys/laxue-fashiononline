@@ -31,14 +31,14 @@ const COUPONS_COLLECTION = 'coupons';
 const BANNERS_COLLECTION = 'banners';
 
 /**
- * Seed initial catalog to Firestore if the collection is empty.
+ * Seed initial catalog to Firestore if the collection is empty or missing products.
  */
 export async function seedFirestoreIfEmpty(): Promise<void> {
   try {
     const productsRef = collection(db, PRODUCTS_COLLECTION);
     const snap = await getDocs(productsRef);
     if (snap.empty) {
-      console.log('[FIREBASE SEED] Seeding initial products to Firestore...');
+      console.log('[FIREBASE SEED] Seeding initial 20 products to Firestore...');
       const batch = writeBatch(db);
       for (const prod of INITIAL_PRODUCTS) {
         const prodDoc = doc(db, PRODUCTS_COLLECTION, prod.id);
@@ -96,6 +96,39 @@ export async function seedFirestoreIfEmpty(): Promise<void> {
     }
   } catch (err) {
     console.error('[FIREBASE SEED ERROR]:', err);
+  }
+}
+
+/**
+ * Explicitly sync/publish all 20 curated catalog products to Firebase Firestore.
+ */
+export async function syncCatalog20ToFirebase(): Promise<{ success: boolean; count: number }> {
+  try {
+    console.log('[FIREBASE SYNC] Syncing 20 catalog products to Firestore...');
+    const batch = writeBatch(db);
+    for (const prod of INITIAL_PRODUCTS) {
+      const prodDoc = doc(db, PRODUCTS_COLLECTION, prod.id);
+      batch.set(prodDoc, {
+        ...prod,
+        status: prod.status || 'published',
+        visibility: prod.visibility || 'online',
+        createdAt: prod.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }, { merge: true });
+    }
+
+    // Sync categories
+    for (const cat of INITIAL_CATEGORIES) {
+      const catDoc = doc(db, CATEGORIES_COLLECTION, cat.id);
+      batch.set(catDoc, cat, { merge: true });
+    }
+
+    await batch.commit();
+    console.log(`[FIREBASE SYNC] Successfully synced ${INITIAL_PRODUCTS.length} products to Firestore.`);
+    return { success: true, count: INITIAL_PRODUCTS.length };
+  } catch (err) {
+    console.error('[FIREBASE SYNC ERROR]:', err);
+    throw err;
   }
 }
 

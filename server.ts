@@ -88,6 +88,12 @@ function initDatabase() {
       const data = fs.readFileSync(DB_FILE, 'utf-8');
       const loaded = JSON.parse(data);
       db = { ...db, ...loaded };
+      if (!loaded.products || loaded.products.length === 0) {
+        db.products = INITIAL_PRODUCTS;
+      }
+      if (!loaded.categories || loaded.categories.length === 0) {
+        db.categories = INITIAL_CATEGORIES;
+      }
       db.settings = { ...INITIAL_SETTINGS, ...(loaded.settings || {}) };
 
       // Initialize or preserve single persistent paymentSettings record

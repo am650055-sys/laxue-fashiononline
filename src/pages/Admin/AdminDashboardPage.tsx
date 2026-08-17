@@ -38,6 +38,7 @@ import {
   saveProductToFirebase,
   updateProductInFirebase,
   deleteProductFromFirebase,
+  syncCatalog20ToFirebase,
   subscribeToProducts,
   subscribeToOrders,
   updateOrderInFirebase,
@@ -178,6 +179,25 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ activeSu
   const [deleteConfirmationProduct, setDeleteConfirmationProduct] = useState<Product | null>(null);
   const [isDeletingProduct, setIsDeletingProduct] = useState(false);
   const [deleteErrorMessage, setDeleteErrorMessage] = useState<string | null>(null);
+  const [isSyncingCatalog, setIsSyncingCatalog] = useState(false);
+  const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
+
+  const handleSync20CatalogProducts = async () => {
+    setIsSyncingCatalog(true);
+    setSyncFeedback(null);
+    try {
+      const res = await syncCatalog20ToFirebase();
+      setSyncFeedback(`Successfully published ${res.count} curated products to Firebase!`);
+      await refreshData();
+      await loadAdminData();
+      setTimeout(() => setSyncFeedback(null), 4000);
+    } catch (err: any) {
+      console.error('Error syncing catalog:', err);
+      setSyncFeedback(err.message || 'Error syncing catalog to Firebase.');
+    } finally {
+      setIsSyncingCatalog(false);
+    }
+  };
 
   useEffect(() => {
     // Subscribe to all products (including drafts and hidden) in Admin View
@@ -1012,14 +1032,42 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ activeSu
                 </div>
               </div>
 
-              <button
-                onClick={openNewProductModal}
-                className="bg-[#801723] hover:bg-[#981E2E] text-[#DFBA67] font-bold text-xs px-4 py-2.5 rounded-xl border border-[#D4AF37] flex items-center gap-1.5 cursor-pointer shadow-md"
-              >
-                <Plus className="w-4 h-4" />
-                <span>ADD NEW PRODUCT</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleSync20CatalogProducts}
+                  disabled={isSyncingCatalog}
+                  className="bg-[#1F060A] hover:bg-[#3B0C13] text-[#DFBA67] font-semibold text-xs px-3.5 py-2.5 rounded-xl border border-[#D4AF37]/50 flex items-center gap-1.5 cursor-pointer shadow transition-colors disabled:opacity-50"
+                  title="Push the complete 20 product catalog to Firebase"
+                >
+                  {isSyncingCatalog ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-[#DFBA67]" />
+                      <span>Syncing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 text-[#DFBA67]" />
+                      <span>Publish 20 Catalog Products</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  onClick={openNewProductModal}
+                  className="bg-[#801723] hover:bg-[#981E2E] text-[#DFBA67] font-bold text-xs px-4 py-2.5 rounded-xl border border-[#D4AF37] flex items-center gap-1.5 cursor-pointer shadow-md"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>ADD NEW PRODUCT</span>
+                </button>
+              </div>
             </div>
+
+            {syncFeedback && (
+              <div className="bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 px-4 py-2.5 rounded-xl text-xs flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>{syncFeedback}</span>
+              </div>
+            )}
 
             <div className="bg-[#2B090E] rounded-2xl border border-[#D4AF37]/30 overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">

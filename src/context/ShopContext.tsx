@@ -218,9 +218,7 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // Subscribe to real-time storefront products (only published & visible products)
         unsubscribeProducts = subscribeToProducts(false, (liveProducts) => {
-          if (liveProducts && liveProducts.length > 0) {
-            setProducts(liveProducts);
-          }
+          setProducts(liveProducts);
           setIsLoading(false);
         });
 
