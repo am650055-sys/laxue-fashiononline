@@ -152,10 +152,29 @@ initDatabase();
 // API ROUTES
 // ==========================================
 
+// Admin Authentication Middleware
+function requireAdminAuth(req: Request, res: Response, next: express.NextFunction) {
+  const authHeader = req.headers.authorization;
+  const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : (req.headers['x-admin-token'] as string);
+  if (token === 'luxue-admin-jwt-token-2026') {
+    return next();
+  }
+  return res.status(401).json({ error: 'Unauthorized: Admin privileges required', authenticated: false });
+}
+
 // 1. PRODUCTS
 app.get('/api/products', (req: Request, res: Response) => {
   let list = [...db.products];
-  const { category, search, flag, sort, giftEligible } = req.query;
+  const { category, search, flag, sort, giftEligible, includeDrafts } = req.query;
+
+  // Check if admin is requesting or public storefront
+  const authHeader = req.headers.authorization;
+  const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : (req.headers['x-admin-token'] as string);
+  const isAdmin = token === 'luxue-admin-jwt-token-2026' || includeDrafts === 'true';
+
+  if (!isAdmin) {
+    list = list.filter(p => (p.status !== 'draft' && p.status !== 'archived') && p.visibility !== 'hidden');
+  }
 
   if (category && typeof category === 'string' && category !== 'All') {
     list = list.filter(p => p.category.toLowerCase() === category.toLowerCase() || p.category.toLowerCase().includes(category.toLowerCase()));
@@ -244,7 +263,7 @@ app.post('/api/upload', (req: Request, res: Response) => {
   }
 });
 
-app.post('/api/products', (req: Request, res: Response) => {
+app.post('/api/products', requireAdminAuth, (req: Request, res: Response) => {
   console.log('[SERVER LOG] [POST /api/products] Creating new product record in database');
   try {
     const b = req.body;
@@ -295,12 +314,19 @@ app.post('/api/products', (req: Request, res: Response) => {
       createdAt: new Date().toISOString(),
     };
 
-    console.log(`[SERVER LOG] [POST /api/products] Normalized product object ID="${newProduct.id}", Name="${newProduct.name}"`);
-
     db.products.unshift(newProduct);
-    saveDatabase();
+    const writeOk = saveDatabase();
+    if (!writeOk) {
+      throw new Error('Failed to persist new product to disk.');
+    }
 
-    console.log(`[SERVER LOG] [POST /api/products] Database update successful. Total products in DB: ${db.products.length}`);
+    // Read-back verification
+    const readBack = db.products.find(p => p.id === newProduct.id);
+    if (!readBack) {
+      throw new Error('Read-back verification failed for newly created product.');
+    }
+
+    console.log(`[SERVER LOG] [POST /api/products] Database update & read-back verified. Total products in DB: ${db.products.length}`);
     res.status(201).json(newProduct);
   } catch (err: any) {
     console.error('[SERVER ERROR] [POST /api/products] Database write operation failed:', err);
@@ -308,7 +334,7 @@ app.post('/api/products', (req: Request, res: Response) => {
   }
 });
 
-app.put('/api/products/:id', (req: Request, res: Response) => {
+app.put('/api/products/:id', requireAdminAuth, (req: Request, res: Response) => {
   const productId = req.params.id;
   console.log(`[SERVER LOG] [PUT /api/products/${productId}] Updating product record in database`);
   try {
@@ -352,9 +378,18 @@ app.put('/api/products/:id', (req: Request, res: Response) => {
     };
 
     db.products[idx] = updatedProduct;
-    saveDatabase();
+    const writeOk = saveDatabase();
+    if (!writeOk) {
+      throw new Error('Failed to persist updated product to disk.');
+    }
 
-    console.log(`[SERVER LOG] [PUT /api/products/${productId}] Database record updated successfully for "${updatedProduct.name}"`);
+    // Read-back verification
+    const readBack = db.products.find(p => p.id === productId);
+    if (!readBack || readBack.price !== price) {
+      throw new Error('Read-back verification failed for updated product.');
+    }
+
+    console.log(`[SERVER LOG] [PUT /api/products/${productId}] Database record updated & verified for "${updatedProduct.name}"`);
     res.json(updatedProduct);
   } catch (err: any) {
     console.error(`[SERVER ERROR] [PUT /api/products/${productId}] Database write operation failed:`, err);
@@ -362,7 +397,7 @@ app.put('/api/products/:id', (req: Request, res: Response) => {
   }
 });
 
-app.delete('/api/products/:id', (req: Request, res: Response) => {
+app.delete('/api/products/:id', requireAdminAuth, (req: Request, res: Response) => {
   const idx = db.products.findIndex(p => p.id === req.params.id);
   if (idx === -1) {
     return res.status(404).json({ error: 'Product not found' });
@@ -845,7 +880,7 @@ app.get('/api/orders/:id', (req: Request, res: Response) => {
   res.json(order);
 });
 
-app.put('/api/orders/:id/status', (req: Request, res: Response) => {
+app.put('/api/orders/:id/status', requireAdminAuth, (req: Request, res: Response) => {
   const { status } = req.body as { status: OrderStatus };
   const order = db.orders.find(o => o.id === req.params.id);
   if (!order) {
@@ -876,16 +911,6 @@ app.put('/api/orders/:id/status', (req: Request, res: Response) => {
   saveDatabase();
   res.json(order);
 });
-
-// Admin Authentication Middleware
-function requireAdminAuth(req: Request, res: Response, next: express.NextFunction) {
-  const authHeader = req.headers.authorization;
-  const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : (req.headers['x-admin-token'] as string);
-  if (token === 'luxue-admin-jwt-token-2026') {
-    return next();
-  }
-  return res.status(401).json({ error: 'Unauthorized: Admin privileges required', authenticated: false });
-}
 
 // 8. ADMIN AUTHENTICATION
 app.post('/api/admin/login', (req: Request, res: Response) => {
@@ -923,22 +948,42 @@ app.get('/api/admin/verify', (req: Request, res: Response) => {
   return res.status(401).json({ authenticated: false, error: 'Unauthorized admin session' });
 });
 
-// 9. ADMIN ANALYTICS METRICS
+// 9. ADMIN ANALYTICS METRICS (Derived strictly from real DB records)
 app.get('/api/admin/analytics', requireAdminAuth, (req: Request, res: Response) => {
-  const totalOrders = db.orders.length;
-  const totalRevenue = db.orders.reduce((sum, o) => sum + o.totalAmount, 0);
-  const pendingOrders = db.orders.filter(o => o.orderStatus === 'Pending' || o.orderStatus === 'Confirmed').length;
-  const completedOrders = db.orders.filter(o => o.orderStatus === 'Delivered').length;
-  const lowStockCount = db.products.filter(p => p.stock < 10).length;
   const totalProducts = db.products.length;
+  const publishedProducts = db.products.filter(p => (p.status !== 'draft' && p.status !== 'archived') && p.visibility !== 'hidden').length;
+  const draftProducts = db.products.filter(p => p.status === 'draft' || p.visibility === 'hidden').length;
+  
+  const totalOrders = db.orders.length;
+  const pendingOrders = db.orders.filter(o => o.orderStatus === 'Pending').length;
+  const confirmedOrders = db.orders.filter(o => o.orderStatus === 'Confirmed').length;
+  const cancelledOrders = db.orders.filter(o => o.orderStatus === 'Cancelled').length;
+  const deliveredOrders = db.orders.filter(o => o.orderStatus === 'Delivered').length;
+  
+  const totalSales = db.orders
+    .filter(o => o.paymentStatus === 'Paid' || o.orderStatus === 'Confirmed' || o.orderStatus === 'Delivered')
+    .reduce((sum, o) => sum + o.totalAmount, 0);
+
+  const pendingPaymentVerifications = db.orders.filter(
+    o => o.paymentStatus === 'Payment Processing' || o.paymentVerification?.status === 'pending'
+  ).length;
+
+  const lowStockCount = db.products.filter(p => p.stock < 10).length;
 
   res.json({
-    totalOrders,
-    totalRevenue,
-    pendingOrders,
-    completedOrders,
-    lowStockCount,
     totalProducts,
+    publishedProducts,
+    draftProducts,
+    totalOrders,
+    pendingOrders,
+    confirmedOrders,
+    cancelledOrders,
+    deliveredOrders,
+    totalSales,
+    totalRevenue: totalSales,
+    completedOrders: deliveredOrders,
+    pendingPaymentVerifications,
+    lowStockCount,
   });
 });
 

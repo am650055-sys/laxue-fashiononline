@@ -552,6 +552,37 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ activeSu
     }
   };
 
+  // Toggle Publish / Draft Status
+  const [togglingProductId, setTogglingProductId] = useState<string | null>(null);
+  const handleTogglePublishStatus = async (product: Product) => {
+    setTogglingProductId(product.id);
+    const newStatus = product.status === 'published' ? 'draft' : 'published';
+    const newVisibility = newStatus === 'published' ? 'online' : 'hidden';
+
+    try {
+      const res = await fetch(`/api/products/${product.id}`, {
+        method: 'PUT',
+        headers: getAuthHeader(),
+        body: JSON.stringify({
+          status: newStatus,
+          visibility: newVisibility,
+        }),
+      });
+
+      if (res.ok) {
+        await refreshData();
+        await loadAdminData();
+      } else {
+        alert('Failed to update product status');
+      }
+    } catch (err) {
+      console.error('Error toggling publish status:', err);
+      alert('Network error while updating product status.');
+    } finally {
+      setTogglingProductId(null);
+    }
+  };
+
   // Delete Product
   const handleDeleteProduct = async (id: string) => {
     if (!confirm('Are you sure you want to delete this product from the inventory?')) return;
@@ -769,10 +800,10 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ activeSu
         {/* 1. DASHBOARD OVERVIEW */}
         {activeTab === 'dashboard' && (
           <div className="space-y-6">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
               <div className="bg-[#2B090E] p-4 rounded-2xl border border-[#D4AF37]/30 shadow-md">
                 <span className="text-[10px] font-extrabold uppercase text-[#DFBA67] block mb-1">Gross Revenue</span>
-                <p className="text-xl font-black text-white">₹{analyticsMetrics.totalRevenue.toLocaleString('en-IN')}</p>
+                <p className="text-xl font-black text-white">₹{(analyticsMetrics.totalSales || analyticsMetrics.totalRevenue || 0).toLocaleString('en-IN')}</p>
               </div>
 
               <div className="bg-[#2B090E] p-4 rounded-2xl border border-[#D4AF37]/30 shadow-md">
@@ -786,13 +817,22 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ activeSu
               </div>
 
               <div className="bg-[#2B090E] p-4 rounded-2xl border border-[#D4AF37]/30 shadow-md">
-                <span className="text-[10px] font-extrabold uppercase text-[#DFBA67] block mb-1">Completed</span>
-                <p className="text-xl font-black text-emerald-400">{analyticsMetrics.completedOrders}</p>
+                <span className="text-[10px] font-extrabold uppercase text-[#DFBA67] block mb-1">Confirmed / Paid</span>
+                <p className="text-xl font-black text-emerald-400">{analyticsMetrics.confirmedOrders + analyticsMetrics.completedOrders}</p>
               </div>
 
               <div className="bg-[#2B090E] p-4 rounded-2xl border border-[#D4AF37]/30 shadow-md">
-                <span className="text-[10px] font-extrabold uppercase text-[#DFBA67] block mb-1">Total Products</span>
-                <p className="text-xl font-black text-white">{products.length}</p>
+                <span className="text-[10px] font-extrabold uppercase text-[#DFBA67] block mb-1">Pending Verification</span>
+                <p className="text-xl font-black text-amber-300">
+                  {orders.filter(o => o.paymentVerification?.status === 'pending' || o.paymentStatus === 'Payment Processing').length}
+                </p>
+              </div>
+
+              <div className="bg-[#2B090E] p-4 rounded-2xl border border-[#D4AF37]/30 shadow-md">
+                <span className="text-[10px] font-extrabold uppercase text-[#DFBA67] block mb-1">Published Products</span>
+                <p className="text-xl font-black text-white">
+                  {products.filter(p => p.status !== 'draft' && p.visibility !== 'hidden').length} / {products.length}
+                </p>
               </div>
 
               <div className="bg-[#2B090E] p-4 rounded-2xl border border-[#D4AF37]/30 shadow-md">
@@ -928,56 +968,75 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ activeSu
                     <th className="p-3">Category</th>
                     <th className="p-3">Price</th>
                     <th className="p-3">Stock</th>
+                    <th className="p-3">Status / Visibility</th>
                     <th className="p-3">Rakhi Gift Status</th>
                     <th className="p-3">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#D4AF37]/20">
-                  {filteredProducts.map(p => (
-                    <tr key={p.id} className="hover:bg-[#3B0C13]/50 transition-colors">
-                      <td className="p-3 flex items-center gap-3">
-                        <img src={p.image} alt={p.name} className="w-10 h-12 object-cover rounded border border-[#D4AF37]/40" />
-                        <div>
-                          <p className="font-bold text-white">{p.name}</p>
-                          <p className="text-[10px] text-[#C2B2A3]">{p.sku}</p>
-                        </div>
-                      </td>
-                      <td className="p-3 font-semibold text-[#DFBA67]">{p.category}</td>
-                      <td className="p-3 font-bold text-white">₹{p.price}</td>
-                      <td className="p-3">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${p.stock < 10 ? 'bg-rose-950 text-rose-300 border border-rose-500/30' : 'bg-emerald-950 text-emerald-300 border border-emerald-500/30'}`}>
-                          {p.stock} pcs
-                        </span>
-                      </td>
-                      <td className="p-3">
-                        <button
-                          onClick={() => handleToggleGiftEligibility(p)}
-                          className={`px-2.5 py-1 rounded text-[10px] font-bold border transition-colors cursor-pointer ${
-                            p.isRakhiGiftEligible
-                              ? 'bg-emerald-950 text-emerald-300 border-emerald-400'
-                              : 'bg-[#1F060A] text-[#A39283] border-[#D4AF37]/30'
-                          }`}
-                        >
-                          {p.isRakhiGiftEligible ? '🎁 ELIGIBLE FOR FREE GIFT' : 'NOT ELIGIBLE'}
-                        </button>
-                      </td>
-                      <td className="p-3 flex items-center gap-2">
-                        <button
-                          onClick={() => openEditProductModal(p)}
-                          className="p-1.5 bg-[#1F060A] text-[#DFBA67] rounded hover:bg-[#3B0C13] border border-[#D4AF37]/40 cursor-pointer"
-                          title="Edit Product"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteProduct(p.id)}
-                          className="p-1.5 bg-rose-950 text-rose-300 rounded hover:bg-rose-900 border border-rose-500/40 cursor-pointer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {filteredProducts.map(p => {
+                    const isPublished = p.status !== 'draft' && p.visibility !== 'hidden';
+                    const isToggling = togglingProductId === p.id;
+                    return (
+                      <tr key={p.id} className="hover:bg-[#3B0C13]/50 transition-colors">
+                        <td className="p-3 flex items-center gap-3">
+                          <img src={p.image} alt={p.name} className="w-10 h-12 object-cover rounded border border-[#D4AF37]/40" />
+                          <div>
+                            <p className="font-bold text-white">{p.name}</p>
+                            <p className="text-[10px] text-[#C2B2A3]">{p.sku}</p>
+                          </div>
+                        </td>
+                        <td className="p-3 font-semibold text-[#DFBA67]">{p.category}</td>
+                        <td className="p-3 font-bold text-white">₹{p.price}</td>
+                        <td className="p-3">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${p.stock < 10 ? 'bg-rose-950 text-rose-300 border border-rose-500/30' : 'bg-emerald-950 text-emerald-300 border border-emerald-500/30'}`}>
+                            {p.stock} pcs
+                          </span>
+                        </td>
+                        <td className="p-3">
+                          <button
+                            onClick={() => handleTogglePublishStatus(p)}
+                            disabled={isToggling}
+                            className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border flex items-center gap-1.5 transition-all cursor-pointer ${
+                              isPublished
+                                ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/50 hover:bg-emerald-900'
+                                : 'bg-neutral-900 text-neutral-400 border-neutral-700 hover:bg-neutral-800'
+                            }`}
+                          >
+                            <span className={`w-2 h-2 rounded-full ${isPublished ? 'bg-emerald-400 animate-pulse' : 'bg-neutral-500'}`} />
+                            <span>{isToggling ? 'Updating...' : isPublished ? 'Published' : 'Draft / Hidden'}</span>
+                          </button>
+                        </td>
+                        <td className="p-3">
+                          <button
+                            onClick={() => handleToggleGiftEligibility(p)}
+                            className={`px-2.5 py-1 rounded text-[10px] font-bold border transition-colors cursor-pointer ${
+                              p.isRakhiGiftEligible
+                                ? 'bg-emerald-950 text-emerald-300 border-emerald-400'
+                                : 'bg-[#1F060A] text-[#A39283] border-[#D4AF37]/30'
+                            }`}
+                          >
+                            {p.isRakhiGiftEligible ? '🎁 ELIGIBLE FOR FREE GIFT' : 'NOT ELIGIBLE'}
+                          </button>
+                        </td>
+                        <td className="p-3 flex items-center gap-2">
+                          <button
+                            onClick={() => openEditProductModal(p)}
+                            className="p-1.5 bg-[#1F060A] text-[#DFBA67] rounded hover:bg-[#3B0C13] border border-[#D4AF37]/40 cursor-pointer"
+                            title="Edit Product"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteProduct(p.id)}
+                            className="p-1.5 bg-rose-950 text-rose-300 rounded hover:bg-rose-900 border border-rose-500/40 cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
