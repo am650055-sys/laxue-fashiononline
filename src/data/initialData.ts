@@ -116,14 +116,14 @@ export const INITIAL_CATEGORIES: Category[] = [
     id: 'cat-cotton-kurtis',
     name: 'Cotton Kurtis',
     slug: 'cotton-kurtis',
-    image: 'https://i.ibb.co/bMKj72Zx/15-81b53017-1f4a-401e-9ff1-2941cf43de45.jpg',
+    image: 'https://i.ibb.co/SX1j6xSB/Instagram-1786879286625-WEBP.webp',
     itemCount: 3,
   },
   {
     id: 'cat-designer-kurtis',
     name: 'Designer Kurtis',
     slug: 'designer-kurtis',
-    image: 'https://i.ibb.co/hFSGY6cM/225-1.jpg',
+    image: 'https://i.ibb.co/M5Q06dPM/Instagram-1786879295138-WEBP.webp',
     itemCount: 2,
   },
   {

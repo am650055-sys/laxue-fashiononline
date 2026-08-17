@@ -37,21 +37,55 @@ export async function seedFirestoreIfEmpty(): Promise<void> {
   try {
     const productsRef = collection(db, PRODUCTS_COLLECTION);
     const snap = await getDocs(productsRef);
-    if (snap.empty) {
-      console.log('[FIREBASE SEED] Seeding initial 20 products to Firestore...');
+
+    const existingDocs = snap.docs;
+    const existingDocIds = new Set(existingDocs.map(d => d.id));
+
+    // If empty or missing initial catalog products, seed / sync all 20
+    const missingAnyCatalog = INITIAL_PRODUCTS.some(p => !existingDocIds.has(p.id));
+    const hasLegacyIds = existingDocIds.has('lux-prod-10-olive-heritage-motif') || existingDocIds.has('lux-prod-11-midnight-navy-architectural');
+
+    if (snap.empty || missingAnyCatalog || hasLegacyIds) {
+      console.log('[FIREBASE SEED] Seeding / syncing all 20 curated products to Firestore with displayOrder 1-20...');
       const batch = writeBatch(db);
-      for (const prod of INITIAL_PRODUCTS) {
+
+      // Clean up legacy IDs
+      if (existingDocIds.has('lux-prod-10-olive-heritage-motif')) {
+        batch.delete(doc(db, PRODUCTS_COLLECTION, 'lux-prod-10-olive-heritage-motif'));
+      }
+      if (existingDocIds.has('lux-prod-11-midnight-navy-architectural')) {
+        batch.delete(doc(db, PRODUCTS_COLLECTION, 'lux-prod-11-midnight-navy-architectural'));
+      }
+
+      INITIAL_PRODUCTS.forEach((prod, index) => {
         const prodDoc = doc(db, PRODUCTS_COLLECTION, prod.id);
+        const galleryUrls = Array.isArray(prod.gallery) && prod.gallery.length > 0
+          ? prod.gallery
+          : [prod.image].filter(Boolean);
+
         batch.set(prodDoc, {
           ...prod,
+          displayOrder: typeof prod.displayOrder === 'number' ? prod.displayOrder : index + 1,
+          published: prod.published !== false,
           status: prod.status || 'published',
           visibility: prod.visibility || 'online',
+          mrp: prod.mrp || prod.originalPrice || 2999,
+          originalPrice: prod.originalPrice || prod.mrp || 2999,
+          price: prod.price || 1499,
+          discount: prod.discount || prod.discountPercent || 50,
+          discountPercent: prod.discountPercent || prod.discount || 50,
+          images: galleryUrls,
+          gallery: galleryUrls,
+          image: prod.image || galleryUrls[0] || '',
+          stock: typeof prod.stock === 'number' ? prod.stock : 50,
+          stockStatus: prod.stockStatus || 'In Stock',
           createdAt: prod.createdAt || new Date().toISOString(),
           updatedAt: new Date().toISOString(),
-        });
-      }
+        }, { merge: true });
+      });
+
       await batch.commit();
-      console.log(`[FIREBASE SEED] Successfully seeded ${INITIAL_PRODUCTS.length} products.`);
+      console.log(`[FIREBASE SEED] Successfully seeded/updated ${INITIAL_PRODUCTS.length} products in Firestore.`);
     }
 
     // Seed Categories
@@ -104,18 +138,45 @@ export async function seedFirestoreIfEmpty(): Promise<void> {
  */
 export async function syncCatalog20ToFirebase(): Promise<{ success: boolean; count: number }> {
   try {
-    console.log('[FIREBASE SYNC] Syncing 20 catalog products to Firestore...');
+    console.log('[FIREBASE SYNC] Syncing 20 catalog products to Firestore with displayOrder 1..20...');
     const batch = writeBatch(db);
-    for (const prod of INITIAL_PRODUCTS) {
+
+    // Clean up potential legacy IDs to prevent any duplication
+    const legacyIds = [
+      'lux-prod-10-olive-heritage-motif',
+      'lux-prod-11-midnight-navy-architectural'
+    ];
+    for (const legId of legacyIds) {
+      const legDoc = doc(db, PRODUCTS_COLLECTION, legId);
+      batch.delete(legDoc);
+    }
+
+    INITIAL_PRODUCTS.forEach((prod, index) => {
       const prodDoc = doc(db, PRODUCTS_COLLECTION, prod.id);
+      const galleryUrls = Array.isArray(prod.gallery) && prod.gallery.length > 0
+        ? prod.gallery
+        : [prod.image].filter(Boolean);
+
       batch.set(prodDoc, {
         ...prod,
-        status: prod.status || 'published',
-        visibility: prod.visibility || 'online',
+        displayOrder: typeof prod.displayOrder === 'number' ? prod.displayOrder : index + 1,
+        published: true,
+        status: 'published',
+        visibility: 'online',
+        mrp: prod.mrp || prod.originalPrice || 2999,
+        originalPrice: prod.originalPrice || prod.mrp || 2999,
+        price: prod.price || 1499,
+        discount: prod.discount || prod.discountPercent || 50,
+        discountPercent: prod.discountPercent || prod.discount || 50,
+        images: galleryUrls,
+        gallery: galleryUrls,
+        image: prod.image || galleryUrls[0] || '',
+        stock: typeof prod.stock === 'number' ? prod.stock : 50,
+        stockStatus: 'In Stock',
         createdAt: prod.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       }, { merge: true });
-    }
+    });
 
     // Sync categories
     for (const cat of INITIAL_CATEGORIES) {
@@ -150,15 +211,30 @@ export function subscribeToProducts(
       const prods: Product[] = [];
       snapshot.forEach((docSnap) => {
         const data = docSnap.data() as Product;
+        const galleryList = Array.isArray(data.images) && data.images.length > 0
+          ? data.images
+          : (Array.isArray(data.gallery) && data.gallery.length > 0 ? data.gallery : [data.image].filter(Boolean));
+
+        const mainImg = data.image || galleryList[0] || '';
+        const isPublished = data.published !== false && data.status !== 'draft' && data.visibility !== 'hidden';
+
         const p: Product = {
           ...data,
           id: docSnap.id, // Guarantee exact Firebase document ID
-          status: data.status || 'published',
-          visibility: data.visibility || 'online',
-          gallery: Array.isArray(data.gallery) && data.gallery.length > 0
-            ? data.gallery
-            : [data.image].filter(Boolean),
-          image: data.image || (data.gallery && data.gallery[0]) || '',
+          published: isPublished,
+          status: isPublished ? 'published' : 'draft',
+          visibility: isPublished ? 'online' : 'hidden',
+          displayOrder: typeof data.displayOrder === 'number' ? data.displayOrder : undefined,
+          mrp: data.mrp || data.originalPrice || 2999,
+          originalPrice: data.originalPrice || data.mrp || 2999,
+          price: Number(data.price || 0),
+          discount: data.discount || data.discountPercent || 50,
+          discountPercent: data.discountPercent || data.discount || 50,
+          images: galleryList,
+          gallery: galleryList,
+          image: mainImg,
+          stock: typeof data.stock === 'number' ? data.stock : 50,
+          stockStatus: data.stockStatus || (typeof data.stock === 'number' && data.stock <= 0 ? 'Out of Stock' : 'In Stock'),
           sizes: Array.isArray(data.sizes) && data.sizes.length > 0 ? data.sizes : ['S', 'M', 'L', 'XL', 'XXL', '3XL'],
           colors: Array.isArray(data.colors) && data.colors.length > 0 ? data.colors : ['Maroon / Wine'],
         };
@@ -167,14 +243,22 @@ export function subscribeToProducts(
           prods.push(p);
         } else {
           // Storefront customer filtering: only published and not hidden
-          if (p.status === 'published' && p.visibility !== 'hidden') {
+          if (isPublished) {
             prods.push(p);
           }
         }
       });
 
-      // Sort newest first by default
-      prods.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+      // Sort by displayOrder ascending (1..20 first), then un-ordered products newest first
+      prods.sort((a, b) => {
+        const orderA = typeof a.displayOrder === 'number' ? a.displayOrder : 99999;
+        const orderB = typeof b.displayOrder === 'number' ? b.displayOrder : 99999;
+        if (orderA !== orderB) {
+          return orderA - orderB;
+        }
+        return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+      });
+
       callback(prods);
     },
     (err) => {
@@ -198,23 +282,26 @@ export async function deleteProductFromFirebase(productId: string): Promise<bool
 }
 
 /**
- * Create or replace a product document in Firebase.
+ * Create or replace a product document in Firebase with full verification.
  */
 export async function saveProductToFirebase(productData: Partial<Product> & { name: string }): Promise<Product> {
   const docId = productData.id || `lux-${Date.now().toString().slice(-6)}`;
   const prodDocRef = doc(db, PRODUCTS_COLLECTION, docId);
 
   const price = Number(productData.price || 0);
-  const originalPrice = Number(productData.originalPrice || price);
-  const discountPercent = originalPrice > price && originalPrice > 0
-    ? Math.round(((originalPrice - price) / originalPrice) * 100)
-    : Number(productData.discountPercent || 0);
+  const mrp = Number(productData.mrp || productData.originalPrice || price);
+  const discount = mrp > price && mrp > 0
+    ? Math.round(((mrp - price) / mrp) * 100)
+    : Number(productData.discount || productData.discountPercent || 0);
 
-  const gallery = Array.isArray(productData.gallery) && productData.gallery.length > 0
-    ? productData.gallery
-    : [productData.image || ''].filter(Boolean);
+  const gallery = Array.isArray(productData.images) && productData.images.length > 0
+    ? productData.images
+    : (Array.isArray(productData.gallery) && productData.gallery.length > 0
+      ? productData.gallery
+      : [productData.image || ''].filter(Boolean));
 
   const mainImage = gallery[0] || productData.image || 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&q=80&w=1000';
+  const isPublished = productData.published !== false && productData.status !== 'draft' && productData.visibility !== 'hidden';
 
   const fullProduct: Product = {
     id: docId,
@@ -224,15 +311,19 @@ export async function saveProductToFirebase(productData: Partial<Product> & { na
     category: productData.category || 'Kurtis',
     subcategory: productData.subcategory?.trim() || 'Printed Kurtis',
     price,
-    originalPrice,
-    discountPercent,
+    originalPrice: mrp,
+    mrp,
+    discountPercent: discount,
+    discount,
     bestPrice: productData.bestPrice || Math.round(price * 0.85),
     image: mainImage,
     gallery: gallery.length > 0 ? gallery : [mainImage],
+    images: gallery.length > 0 ? gallery : [mainImage],
     sizes: Array.isArray(productData.sizes) && productData.sizes.length > 0 ? productData.sizes : ['S', 'M', 'L', 'XL', 'XXL', '3XL'],
     colors: Array.isArray(productData.colors) && productData.colors.length > 0 ? productData.colors : ['Maroon / Wine'],
     fabric: productData.fabric?.trim() || 'Premium Fabric',
-    stock: Number(productData.stock ?? 25),
+    stock: typeof productData.stock === 'number' ? productData.stock : 50,
+    stockStatus: productData.stockStatus || (typeof productData.stock === 'number' && productData.stock <= 0 ? 'Out of Stock' : 'In Stock'),
     rating: Number(productData.rating || 4.8),
     reviewsCount: Number(productData.reviewsCount || 1),
     isNewArrival: Boolean(productData.isNewArrival ?? true),
@@ -240,31 +331,75 @@ export async function saveProductToFirebase(productData: Partial<Product> & { na
     isTrending: Boolean(productData.isTrending ?? true),
     isFeatured: Boolean(productData.isFeatured ?? true),
     isRakhiGiftEligible: Boolean(productData.isRakhiGiftEligible ?? true),
-    status: productData.status || 'published',
-    visibility: productData.visibility || 'online',
+    status: isPublished ? 'published' : 'draft',
+    visibility: isPublished ? 'online' : 'hidden',
+    published: isPublished,
+    displayOrder: typeof productData.displayOrder === 'number' ? productData.displayOrder : undefined,
     sku: productData.sku || `LUX-MPK-${Math.floor(100 + Math.random() * 900)}`,
     createdAt: productData.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   };
 
-  await setDoc(prodDocRef, {
-    ...fullProduct,
-    updatedAt: new Date().toISOString(),
-  }, { merge: true });
+  // 1. Write product to Firebase
+  await setDoc(prodDocRef, fullProduct, { merge: true });
 
-  console.log(`[FIRESTORE] Saved product doc ID: ${docId}`);
+  // 2. Read the same product back from Firebase to verify
+  const verifySnap = await getDoc(prodDocRef);
+  if (!verifySnap.exists()) {
+    throw new Error(`Firebase verification failed: Document ${docId} was not created.`);
+  }
+
+  const savedData = verifySnap.data();
+  if (!savedData.name || !Array.isArray(savedData.images || savedData.gallery)) {
+    throw new Error(`Firebase verification failed: Incomplete product data saved for ${docId}.`);
+  }
+
+  console.log(`[FIRESTORE VERIFIED] Successfully wrote & verified product doc ID: ${docId}`);
   return fullProduct;
 }
 
 /**
- * Update partial fields on a product document in Firebase.
+ * Update partial fields on a product document in Firebase with read-back verification.
  */
 export async function updateProductInFirebase(productId: string, updates: Partial<Product>): Promise<void> {
   const prodDocRef = doc(db, PRODUCTS_COLLECTION, productId);
-  await updateDoc(prodDocRef, {
+  
+  const payload: Record<string, any> = {
     ...updates,
     updatedAt: new Date().toISOString(),
-  });
-  console.log(`[FIRESTORE] Updated product doc ID: ${productId}`);
+  };
+
+  if (updates.published !== undefined) {
+    payload.published = updates.published;
+    payload.status = updates.published ? 'published' : 'draft';
+    payload.visibility = updates.published ? 'online' : 'hidden';
+  } else if (updates.status !== undefined || updates.visibility !== undefined) {
+    const isPub = updates.status === 'published' && updates.visibility !== 'hidden';
+    payload.published = isPub;
+  }
+
+  if (updates.gallery && !updates.images) {
+    payload.images = updates.gallery;
+  } else if (updates.images && !updates.gallery) {
+    payload.gallery = updates.images;
+  }
+
+  if (updates.originalPrice && !updates.mrp) {
+    payload.mrp = updates.originalPrice;
+  }
+  if (updates.discountPercent && !updates.discount) {
+    payload.discount = updates.discountPercent;
+  }
+
+  await updateDoc(prodDocRef, payload);
+
+  // Verification read-back
+  const verifySnap = await getDoc(prodDocRef);
+  if (!verifySnap.exists()) {
+    throw new Error(`Firebase verification failed: Product ${productId} not found after update.`);
+  }
+
+  console.log(`[FIRESTORE VERIFIED] Updated and verified product doc ID: ${productId}`);
 }
 
 /**

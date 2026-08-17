@@ -10,15 +10,19 @@ export interface Product {
   tags?: string[];
   price: number;
   originalPrice: number;
+  mrp?: number;
   discountPercent: number;
+  discount?: number;
   bestPrice: number;
   offerBadge?: string;
   image: string;
   gallery: string[];
+  images?: string[];
   sizes: Size[];
   colors: string[];
   fabric: string;
   stock: number;
+  stockStatus?: string;
   rating: number;
   reviewsCount: number;
   isNewArrival: boolean;
@@ -37,12 +41,15 @@ export interface Product {
   fit?: string;
   status?: 'published' | 'draft' | 'archived';
   visibility?: 'online' | 'hidden';
+  published?: boolean;
+  displayOrder?: number;
   slug?: string;
   seoTitle?: string;
   seoDescription?: string;
   seoKeywords?: string[];
   sku: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface Category {

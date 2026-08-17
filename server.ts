@@ -90,6 +90,18 @@ function initDatabase() {
       db = { ...db, ...loaded };
       if (!loaded.products || loaded.products.length === 0) {
         db.products = INITIAL_PRODUCTS;
+      } else {
+        // Ensure Product #10 and #11 are synced with latest catalog
+        const legacyIds = ['lux-prod-10-olive-heritage-motif', 'lux-prod-11-midnight-navy-architectural'];
+        db.products = db.products.filter(p => !legacyIds.includes(p.id));
+        for (const initP of INITIAL_PRODUCTS) {
+          const idx = db.products.findIndex(p => p.id === initP.id);
+          if (idx === -1) {
+            db.products.push(initP);
+          } else if (initP.id === 'lux-prod-10-heritage-botanical-kurti' || initP.id === 'lux-prod-11-royal-lattice-architectural') {
+            db.products[idx] = { ...db.products[idx], ...initP };
+          }
+        }
       }
       if (!loaded.categories || loaded.categories.length === 0) {
         db.categories = INITIAL_CATEGORIES;
