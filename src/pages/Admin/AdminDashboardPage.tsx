@@ -34,6 +34,14 @@ import {
 import { useShop } from '../../context/ShopContext';
 import { Product, Order, OrderStatus, Coupon, RakhiOfferConfig, StoreSettings, BannerConfig, Size } from '../../types';
 import { AdminPaymentSettings } from '../../components/admin/AdminPaymentSettings';
+import {
+  saveProductToFirebase,
+  updateProductInFirebase,
+  deleteProductFromFirebase,
+  subscribeToProducts,
+  subscribeToOrders,
+  updateOrderInFirebase,
+} from '../../lib/firestoreService';
 
 export type AdminTab =
   | 'dashboard'
@@ -164,6 +172,32 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ activeSu
   const [isPublishingProduct, setIsPublishingProduct] = useState(false);
   const [publishSuccessMessage, setPublishSuccessMessage] = useState<string | null>(null);
   const [publishErrorMessage, setPublishErrorMessage] = useState<string | null>(null);
+
+  // Firestore Product & Order Real-time Subscriptions
+  const [adminProducts, setAdminProducts] = useState<Product[]>(products);
+  const [deleteConfirmationProduct, setDeleteConfirmationProduct] = useState<Product | null>(null);
+  const [isDeletingProduct, setIsDeletingProduct] = useState(false);
+  const [deleteErrorMessage, setDeleteErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Subscribe to all products (including drafts and hidden) in Admin View
+    const unsubscribe = subscribeToProducts(true, (liveProducts) => {
+      if (liveProducts) {
+        setAdminProducts(liveProducts);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    // Subscribe to all orders in Admin View
+    const unsubscribe = subscribeToOrders((liveOrders) => {
+      if (liveOrders) {
+        setOrders(liveOrders);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Get Admin Auth Header
   const getAuthHeader = () => {
@@ -473,9 +507,6 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ activeSu
 
     setIsPublishingProduct(true);
 
-    const url = editingProductId ? `/api/products/${editingProductId}` : '/api/products';
-    const method = editingProductId ? 'PUT' : 'POST';
-
     const discountCalculated =
       productForm.originalPrice > productForm.price
         ? Math.round(((productForm.originalPrice - productForm.price) / productForm.originalPrice) * 100)
@@ -506,48 +537,43 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ activeSu
       isRakhiGiftEligible: productForm.isRakhiGiftEligible,
     };
 
-    console.log(`[ADMIN WORKFLOW LOG] Preparing to send ${method} request to ${url}`);
-    console.log('[ADMIN WORKFLOW LOG] Request Payload:', JSON.stringify(payload, null, 2));
-
     try {
-      const res = await fetch(url, {
-        method,
-        headers: getAuthHeader(),
-        body: JSON.stringify(payload),
-      });
-
-      console.log(`[ADMIN WORKFLOW LOG] ${method} ${url} Response status: ${res.status} ${res.statusText}`);
-
-      if (res.ok) {
-        const savedProduct = await res.json();
-        console.log('[ADMIN WORKFLOW LOG] Server successfully saved product to database! Returned product object:', savedProduct);
-        
-        setPublishSuccessMessage(
-          editingProductId ? 'Product updated successfully.' : 'Product published successfully.'
-        );
-
-        console.log('[ADMIN WORKFLOW LOG] Refreshing app shop data and admin statistics...');
-        await refreshData();
-        await loadAdminData();
-
-        setTimeout(() => {
-          console.log('[ADMIN WORKFLOW LOG] Closing product modal and switching to products tab');
-          setIsProductModalOpen(false);
-          setEditingProductId(null);
-          setIsPublishingProduct(false);
-          setPublishSuccessMessage(null);
-          handleTabChange('products');
-        }, 1000);
+      if (editingProductId) {
+        // Direct Firebase Update
+        await updateProductInFirebase(editingProductId, payload);
       } else {
-        const errData = await res.json().catch(() => ({}));
-        const errMsg = errData.error || 'Unable to publish product. Please check your database/storage configuration.';
-        setPublishErrorMessage(errMsg);
-        console.error('[ADMIN WORKFLOW LOG] Failed to publish product. Status:', res.status, 'Response error:', errMsg, errData);
-        setIsPublishingProduct(false);
+        // Direct Firebase Create
+        await saveProductToFirebase(payload);
       }
+
+      // Also notify backend if online
+      try {
+        const url = editingProductId ? `/api/products/${editingProductId}` : '/api/products';
+        const method = editingProductId ? 'PUT' : 'POST';
+        await fetch(url, {
+          method,
+          headers: getAuthHeader(),
+          body: JSON.stringify(payload),
+        });
+      } catch {}
+
+      setPublishSuccessMessage(
+        editingProductId ? 'Product updated successfully in Firebase.' : 'Product published successfully to Firebase live store.'
+      );
+
+      await refreshData();
+      await loadAdminData();
+
+      setTimeout(() => {
+        setIsProductModalOpen(false);
+        setEditingProductId(null);
+        setIsPublishingProduct(false);
+        setPublishSuccessMessage(null);
+        handleTabChange('products');
+      }, 1000);
     } catch (err: any) {
-      console.error('[ADMIN WORKFLOW LOG] Network or client exception saving product:', err);
-      setPublishErrorMessage('Unable to publish product. Please check your database/storage configuration.');
+      console.error('[ADMIN WORKFLOW LOG] Firebase error saving product:', err);
+      setPublishErrorMessage(err.message || 'Unable to publish product. Please check your Firebase database connection.');
       setIsPublishingProduct(false);
     }
   };
@@ -560,54 +586,89 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ activeSu
     const newVisibility = newStatus === 'published' ? 'online' : 'hidden';
 
     try {
-      const res = await fetch(`/api/products/${product.id}`, {
-        method: 'PUT',
-        headers: getAuthHeader(),
-        body: JSON.stringify({
-          status: newStatus,
-          visibility: newVisibility,
-        }),
+      // 1. Direct Firebase update
+      await updateProductInFirebase(product.id, {
+        status: newStatus,
+        visibility: newVisibility,
       });
 
-      if (res.ok) {
-        await refreshData();
-        await loadAdminData();
-      } else {
-        alert('Failed to update product status');
-      }
+      // 2. Also notify backend
+      try {
+        await fetch(`/api/products/${product.id}`, {
+          method: 'PUT',
+          headers: getAuthHeader(),
+          body: JSON.stringify({
+            status: newStatus,
+            visibility: newVisibility,
+          }),
+        });
+      } catch {}
+
+      await refreshData();
+      await loadAdminData();
     } catch (err) {
-      console.error('Error toggling publish status:', err);
-      alert('Network error while updating product status.');
+      console.error('Error toggling publish status in Firebase:', err);
+      alert('Error while updating product status in Firebase.');
     } finally {
       setTogglingProductId(null);
     }
   };
 
-  // Delete Product
-  const handleDeleteProduct = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this product from the inventory?')) return;
+  // Open Delete Confirmation Modal
+  const openDeleteModal = (product: Product) => {
+    setDeleteConfirmationProduct(product);
+    setDeleteErrorMessage(null);
+  };
+
+  // Confirm Delete Product from Firebase
+  const confirmDeleteProduct = async () => {
+    if (!deleteConfirmationProduct) return;
+    const prodId = deleteConfirmationProduct.id;
+    setIsDeletingProduct(true);
+    setDeleteErrorMessage(null);
+
     try {
-      const res = await fetch(`/api/products/${id}`, {
-        method: 'DELETE',
-        headers: getAuthHeader(),
-      });
-      if (res.ok) {
-        await refreshData();
-        await loadAdminData();
-      }
-    } catch (err) {
-      console.error('Error deleting product:', err);
+      console.log(`[ADMIN DELETE] Deleting product ${prodId} directly from Firebase Firestore...`);
+      // 1. Delete from Firebase Firestore using exact document ID
+      await deleteProductFromFirebase(prodId);
+
+      // 2. Also notify Express backend if running
+      try {
+        await fetch(`/api/products/${prodId}`, {
+          method: 'DELETE',
+          headers: getAuthHeader(),
+        });
+      } catch {}
+
+      // 3. Immediately refresh and update UI
+      await refreshData();
+      await loadAdminData();
+
+      // Close modal
+      setDeleteConfirmationProduct(null);
+    } catch (err: any) {
+      console.error('[ADMIN DELETE] Error deleting product from Firebase:', err);
+      setDeleteErrorMessage(err.message || 'Failed to delete product from database. Please try again.');
+    } finally {
+      setIsDeletingProduct(false);
     }
   };
 
   // Toggle Gift Eligibility
   const handleToggleGiftEligibility = async (product: Product) => {
     try {
-      await fetch(`/api/products/${product.id}`, {
-        method: 'PUT',
-        headers: getAuthHeader(),
-        body: JSON.stringify({ isRakhiGiftEligible: !product.isRakhiGiftEligible }),
+      await updateProductInFirebase(product.id, {
+        isRakhiGiftEligible: !product.isRakhiGiftEligible,
       });
+
+      try {
+        await fetch(`/api/products/${product.id}`, {
+          method: 'PUT',
+          headers: getAuthHeader(),
+          body: JSON.stringify({ isRakhiGiftEligible: !product.isRakhiGiftEligible }),
+        });
+      } catch {}
+
       await refreshData();
     } catch (err) {
       console.error('Error toggling gift eligibility:', err);
@@ -683,7 +744,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ activeSu
   };
 
   // Filtered Products
-  const filteredProducts = products.filter(p => {
+  const filteredProducts = adminProducts.filter(p => {
     const matchesSearch =
       p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
       (p.sku && p.sku.toLowerCase().includes(productSearch.toLowerCase())) ||
@@ -1028,8 +1089,9 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ activeSu
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
                           <button
-                            onClick={() => handleDeleteProduct(p.id)}
-                            className="p-1.5 bg-rose-950 text-rose-300 rounded hover:bg-rose-900 border border-rose-500/40 cursor-pointer"
+                            onClick={() => openDeleteModal(p)}
+                            className="p-1.5 bg-rose-950/80 hover:bg-rose-900 text-rose-300 rounded-lg border border-rose-500/40 cursor-pointer transition-colors"
+                            title="Delete Product"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -2285,6 +2347,90 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ activeSu
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* FIREBASE PRODUCT DELETE CONFIRMATION MODAL */}
+      {deleteConfirmationProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="bg-[#2B090E] border-2 border-rose-500/60 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 text-white">
+            <div className="flex items-center gap-3 border-b border-rose-500/30 pb-4">
+              <div className="w-12 h-12 rounded-2xl bg-rose-950/80 border border-rose-500/50 flex items-center justify-center text-rose-400 flex-shrink-0">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-serif-luxury text-lg font-bold text-white">
+                  Delete this product?
+                </h3>
+                <p className="text-xs text-rose-300 font-medium">
+                  This action cannot be undone.
+                </p>
+              </div>
+            </div>
+
+            {/* Product Summary */}
+            <div className="flex items-center gap-3.5 p-3 rounded-2xl bg-[#1F060A] border border-[#D4AF37]/30">
+              <img
+                src={deleteConfirmationProduct.image}
+                alt={deleteConfirmationProduct.name}
+                className="w-14 h-16 object-cover rounded-xl border border-[#D4AF37]/40 flex-shrink-0"
+              />
+              <div className="min-w-0 flex-1">
+                <p className="font-bold text-xs text-white truncate">{deleteConfirmationProduct.name}</p>
+                <p className="text-[11px] text-[#DFBA67] font-semibold">{deleteConfirmationProduct.category} • ₹{deleteConfirmationProduct.price}</p>
+                <p className="text-[10px] text-neutral-400 font-mono mt-0.5 truncate">
+                  ID: {deleteConfirmationProduct.id}
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-[#C2B2A3] leading-relaxed">
+              This will permanently delete this product from the Firebase Firestore database and immediately remove it from the customer storefront catalog.
+            </p>
+
+            {deleteErrorMessage && (
+              <div className="p-3 bg-rose-950/90 border border-rose-500/60 rounded-xl text-xs text-rose-200 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />
+                <span>{deleteErrorMessage}</span>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!isDeletingProduct) {
+                    setDeleteConfirmationProduct(null);
+                    setDeleteErrorMessage(null);
+                  }
+                }}
+                disabled={isDeletingProduct}
+                className="flex-1 py-3 text-xs font-bold bg-[#1F060A] hover:bg-[#3B0C13] rounded-xl border border-[#D4AF37]/30 text-white cursor-pointer disabled:opacity-50 transition-colors"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={confirmDeleteProduct}
+                disabled={isDeletingProduct}
+                className="flex-1 py-3 text-xs font-extrabold bg-rose-700 hover:bg-rose-600 text-white rounded-xl border border-rose-500 cursor-pointer shadow-lg uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-50 transition-all"
+              >
+                {isDeletingProduct ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    <span>Deleting from Firebase...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    <span>Delete Product</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

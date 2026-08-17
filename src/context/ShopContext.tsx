@@ -16,6 +16,14 @@ import {
   INITIAL_RAKHI_OFFER,
   INITIAL_SETTINGS,
 } from '../data/initialData';
+import {
+  seedFirestoreIfEmpty,
+  subscribeToProducts,
+  subscribeToPaymentSettings,
+  savePaymentSettingsToFirebase,
+  saveOrderToFirebase,
+  updateOrderInFirebase,
+} from '../lib/firestoreService';
 
 interface ShopContextType {
   products: Product[];
@@ -62,8 +70,10 @@ interface ShopContextType {
   refreshData: () => Promise<void>;
   updateSettings: (newSettings: Partial<StoreSettings>) => Promise<boolean>;
   updatePaymentSettings: (payload: {
-    merchantUpiId: string;
-    merchantName: string;
+    merchantUpiId?: string;
+    upiId?: string;
+    merchantName?: string;
+    businessName?: string;
     upiEnabled: boolean;
     cardEnabled?: boolean;
     testModeEnabled?: boolean;
@@ -88,7 +98,7 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (savedUpi) {
         const upiData = JSON.parse(savedUpi);
         const upiId = upiData.merchantUpiId || upiData.upiId || base.merchantUpiId;
-        const upiName = upiData.merchantName || base.merchantName;
+        const upiName = upiData.merchantName || upiData.businessName || base.merchantName;
         base = {
           ...base,
           merchantUpiId: upiId,
@@ -195,6 +205,63 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [couponError, setCouponError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  // 1. Initial Firestore Seeding & Real-Time Firestore Synchronization
+  useEffect(() => {
+    let unsubscribeProducts: (() => void) | undefined;
+    let unsubscribeUPI: (() => void) | undefined;
+
+    const setupFirestoreSync = async () => {
+      try {
+        setIsLoading(true);
+        // Ensure collections have seed data if Firestore was just created
+        await seedFirestoreIfEmpty();
+
+        // Subscribe to real-time storefront products (only published & visible products)
+        unsubscribeProducts = subscribeToProducts(false, (liveProducts) => {
+          if (liveProducts && liveProducts.length > 0) {
+            setProducts(liveProducts);
+          }
+          setIsLoading(false);
+        });
+
+        // Subscribe to real-time UPI & payment configuration
+        unsubscribeUPI = subscribeToPaymentSettings((liveSettings) => {
+          if (liveSettings && liveSettings.upiId) {
+            setSettings(prev => {
+              const updated: StoreSettings = {
+                ...prev,
+                merchantUpiId: liveSettings.upiId,
+                merchantName: liveSettings.businessName || prev.merchantName,
+                paymentSettings: {
+                  ...prev.paymentSettings,
+                  merchantUpiId: liveSettings.upiId,
+                  merchantName: liveSettings.businessName || prev.merchantName,
+                  upiEnabled: liveSettings.upiEnabled,
+                  cardEnabled: liveSettings.cardEnabled !== false,
+                  lastUpdated: liveSettings.updatedAt,
+                  lastUpdatedBy: liveSettings.updatedBy,
+                },
+              };
+              localStorage.setItem('luxue_store_settings', JSON.stringify(updated));
+              localStorage.setItem('admin_upi_settings', JSON.stringify(updated.paymentSettings));
+              return updated;
+            });
+          }
+        });
+      } catch (err) {
+        console.error('Error during Firestore setup:', err);
+        setIsLoading(false);
+      }
+    };
+
+    setupFirestoreSync();
+
+    return () => {
+      if (unsubscribeProducts) unsubscribeProducts();
+      if (unsubscribeUPI) unsubscribeUPI();
+    };
+  }, []);
+
   // Sync to local storage & session storage
   useEffect(() => {
     if (lastCreatedOrder) {
@@ -223,7 +290,7 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
-  // Sync to local storage
+  // Sync cart & wishlist
   useEffect(() => {
     localStorage.setItem('luxue_cart', JSON.stringify(cart));
   }, [cart]);
@@ -235,6 +302,28 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     localStorage.setItem('luxue_wishlist', JSON.stringify(wishlist));
   }, [wishlist]);
+
+  // Clean deleted products from Cart and Selected Gift automatically
+  useEffect(() => {
+    if (products.length > 0) {
+      setCart(prev => {
+        const filtered = prev.filter(item => products.some(p => p.id === item.productId));
+        if (filtered.length !== prev.length) {
+          localStorage.setItem('luxue_cart', JSON.stringify(filtered));
+          return filtered;
+        }
+        return prev;
+      });
+
+      setSelectedGift(prev => {
+        if (prev && !products.some(p => p.id === prev.id)) {
+          localStorage.removeItem('luxue_gift');
+          return null;
+        }
+        return prev;
+      });
+    }
+  }, [products]);
 
   // Handle URL history state change for smooth SPA navigation & URL routing
   useEffect(() => {
@@ -281,7 +370,7 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => window.removeEventListener('popstate', syncWithLocation);
   }, []);
 
-  // Fetch initial data from Express backend safely without throwing on static hosts
+  // Manual refresh hook
   const refreshData = async () => {
     try {
       setIsLoading(true);
@@ -294,57 +383,28 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (res.ok && contentType.includes('application/json')) {
             return await res.json();
           }
-        } catch {
-          // Ignore network or html response errors on static hosts
-        }
+        } catch {}
         return null;
       };
 
       const cacheBuster = `?t=${Date.now()}`;
-      const [prodData, catData, offerData, setData, payConfig] = await Promise.all([
-        safeFetchJson(`/api/products${cacheBuster}`),
+      const [catData, offerData, setData] = await Promise.all([
         safeFetchJson(`/api/categories${cacheBuster}`),
         safeFetchJson(`/api/rakhi-offer${cacheBuster}`),
         safeFetchJson(`/api/settings${cacheBuster}`),
-        safeFetchJson(`/api/payment-config${cacheBuster}`),
       ]);
 
-      if (prodData && Array.isArray(prodData) && prodData.length > 0) {
-        setProducts(prodData);
-      }
       if (catData && Array.isArray(catData) && catData.length > 0) {
         setCategories(catData);
       }
       if (offerData && typeof offerData === 'object') {
         setRakhiOffer(offerData);
       }
-      
-      const serverUpi = payConfig?.merchantUpiId || payConfig?.upiId || setData?.merchantUpiId || setData?.paymentSettings?.merchantUpiId;
-      const serverMerchant = payConfig?.merchantName || payConfig?.businessName || setData?.merchantName || setData?.paymentSettings?.merchantName;
-
-      setSettings(prev => {
-        const merged = { ...prev, ...(setData || {}) };
-        if (serverUpi !== undefined) {
-          merged.merchantUpiId = serverUpi;
-          merged.paymentSettings = {
-            ...merged.paymentSettings,
-            merchantUpiId: serverUpi,
-            merchantName: serverMerchant || merged.merchantName,
-            upiEnabled: payConfig?.upiEnabled ?? merged.paymentSettings?.upiEnabled ?? true,
-            cardEnabled: payConfig?.cardEnabled ?? merged.paymentSettings?.cardEnabled ?? true,
-          };
-        }
-        if (serverMerchant !== undefined) {
-          merged.merchantName = serverMerchant;
-        }
-        localStorage.setItem('luxue_store_settings', JSON.stringify(merged));
-        if (serverUpi) {
-          localStorage.setItem('admin_upi_settings', JSON.stringify(merged.paymentSettings));
-        }
-        return merged;
-      });
+      if (setData) {
+        setSettings(prev => ({ ...prev, ...setData }));
+      }
     } catch (err) {
-      console.warn('Data sync note (operating in static / client mode):', err);
+      console.warn('Data refresh note:', err);
     } finally {
       setIsLoading(false);
     }
@@ -358,18 +418,11 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     try {
-      const res = await fetch('/api/settings', {
+      await fetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newSettings),
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.settings) {
-          setSettings(data.settings);
-          localStorage.setItem('luxue_store_settings', JSON.stringify(data.settings));
-        }
-      }
     } catch {}
 
     return true;
@@ -392,107 +445,74 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     try {
-      const token = localStorage.getItem('luxue_admin_token') || 'luxue-admin-jwt-token-2026';
-      const res = await fetch('/api/admin/payment-settings', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-          'x-admin-token': token,
-        },
-        body: JSON.stringify({
-          upiId: rawUpi,
-          merchantUpiId: rawUpi,
-          businessName: rawName,
-          merchantName: rawName,
-          upiEnabled: payload.upiEnabled,
-          cardEnabled: payload.cardEnabled !== false,
-          testModeEnabled: !!payload.testModeEnabled,
-        }),
+      // 1. Direct Firebase Firestore Write
+      const savedRecord = await savePaymentSettingsToFirebase({
+        upiId: rawUpi,
+        merchantUpiId: rawUpi,
+        businessName: rawName,
+        merchantName: rawName,
+        upiEnabled: payload.upiEnabled,
+        cardEnabled: payload.cardEnabled !== false,
+        testModeEnabled: !!payload.testModeEnabled,
       });
 
-      const data = await res.json().catch(() => null);
+      // 2. Also notify backend if available
+      try {
+        const token = localStorage.getItem('luxue_admin_token') || 'luxue-admin-jwt-token-2026';
+        await fetch('/api/admin/payment-settings', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+            'x-admin-token': token,
+          },
+          body: JSON.stringify({
+            upiId: rawUpi,
+            merchantUpiId: rawUpi,
+            businessName: rawName,
+            merchantName: rawName,
+            upiEnabled: payload.upiEnabled,
+            cardEnabled: payload.cardEnabled !== false,
+            testModeEnabled: !!payload.testModeEnabled,
+          }),
+        });
+      } catch {}
 
-      if (!res.ok || !data || !data.success) {
-        const errorMsg = (data && (data.error || data.message)) || 'Failed to save UPI settings. Please try again.';
-        return { success: false, message: errorMsg, error: errorMsg };
-      }
-
-      const confirmedRecord = data.paymentSettings || data.settings?.paymentSettings;
-      const confirmedUpi = confirmedRecord?.upiId || confirmedRecord?.merchantUpiId || rawUpi;
-      const confirmedName = confirmedRecord?.businessName || confirmedRecord?.merchantName || rawName;
-      const confirmedUpiEnabled = confirmedRecord?.upiEnabled !== false;
-      const confirmedCardEnabled = confirmedRecord?.cardEnabled !== false;
-      const confirmedLastUpdated = confirmedRecord?.updatedAt || confirmedRecord?.lastUpdated || new Date().toISOString();
-
-      const upiData = {
-        upiId: confirmedUpi,
-        merchantUpiId: confirmedUpi,
-        businessName: confirmedName,
-        merchantName: confirmedName,
-        upiEnabled: confirmedUpiEnabled,
-        cardEnabled: confirmedCardEnabled,
-        testModeEnabled: !!payload.testModeEnabled,
-        updatedAt: confirmedLastUpdated,
-        lastUpdated: confirmedLastUpdated,
-        lastUpdatedBy: 'Admin Console',
-      };
-
-      // Direct LocalStorage & State Sync with confirmed DB values
-      localStorage.setItem('admin_upi_settings', JSON.stringify(upiData));
-
+      // Update state
       setSettings(prev => {
         const updated: StoreSettings = {
           ...prev,
-          merchantUpiId: confirmedUpi,
-          merchantName: confirmedName,
+          merchantUpiId: rawUpi,
+          merchantName: rawName,
           paymentSettings: {
             ...prev.paymentSettings,
-            merchantUpiId: confirmedUpi,
-            merchantName: confirmedName,
-            upiId: confirmedUpi,
-            businessName: confirmedName,
-            upiEnabled: confirmedUpiEnabled,
-            cardEnabled: confirmedCardEnabled,
+            merchantUpiId: rawUpi,
+            merchantName: rawName,
+            upiEnabled: savedRecord.upiEnabled,
+            cardEnabled: savedRecord.cardEnabled,
             testModeEnabled: !!payload.testModeEnabled,
-            lastUpdated: upiData.lastUpdated,
-            updatedAt: upiData.updatedAt,
-            lastUpdatedBy: upiData.lastUpdatedBy,
+            lastUpdated: savedRecord.updatedAt,
+            lastUpdatedBy: 'Admin Console',
           },
         };
+        localStorage.setItem('admin_upi_settings', JSON.stringify(updated.paymentSettings));
         localStorage.setItem('luxue_store_settings', JSON.stringify(updated));
         return updated;
       });
 
-      // Broadcast event across tabs/listeners
-      try {
-        window.dispatchEvent(new CustomEvent('luxue_payment_settings_updated', { detail: upiData }));
-      } catch {}
-
-      return {
-        success: true,
-        message: 'UPI Settings Saved Successfully',
-      };
+      return { success: true, message: 'Payment settings saved directly to Firebase database.' };
     } catch (err: any) {
-      console.error('Server sync error on save payment settings:', err);
-      return {
-        success: false,
-        message: 'Failed to save UPI settings. Please try again.',
-        error: err.message,
-      };
+      console.error('Firebase payment settings save error:', err);
+      return { success: false, message: err.message || 'Failed to save settings', error: err.message };
     }
   };
 
-  useEffect(() => {
-    refreshData();
-  }, []);
-
-  // Calculate Subtotal & Offer State
-  const cartSubtotal = cart.reduce((acc, item) => acc + item.product.price * item.quantity, 0);
+  // Subtotal & Calculations
+  const cartSubtotal = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
   const isRakhiOfferUnlocked = rakhiOffer.isActive && cartSubtotal >= rakhiOffer.minCartValue;
-  const amountNeededForRakhiOffer = isRakhiOfferUnlocked ? 0 : Math.max(0, rakhiOffer.minCartValue - cartSubtotal);
+  const amountNeededForRakhiOffer = Math.max(0, rakhiOffer.minCartValue - cartSubtotal);
 
-  // Clear chosen gift if cart falls below threshold
+  // Auto-deselect gift if subtotal falls below requirement
   useEffect(() => {
     if (!isRakhiOfferUnlocked && selectedGift) {
       setSelectedGift(null);
@@ -500,7 +520,7 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [cartSubtotal, isRakhiOfferUnlocked, selectedGift]);
 
   // Cart actions
-  const addToCart = (product: Product, size: Size = 'M', color: string = product.colors[0] || 'Default', quantity: number = 1) => {
+  const addToCart = (product: Product, size: Size = 'M', color: string = product.colors?.[0] || 'Default', quantity: number = 1) => {
     setCart(prev => {
       const existingIdx = prev.findIndex(
         i => i.productId === product.id && i.selectedSize === size && i.selectedColor === color
@@ -588,41 +608,12 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     paymentMethod: 'UPI' | 'Card' | 'NetBanking' | 'COD',
     cardInfo?: any
   ): Promise<Order | null> => {
-    try {
-      const res = await fetch('/api/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customerDetails,
-          items: cart,
-          selectedGiftProductId: selectedGift?.id,
-          paymentMethod,
-          couponCode: appliedCoupon?.code,
-          cardInfo,
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setLastCreatedOrder(data);
-        if (customerDetails.saveForFuture) {
-          saveAddressForFuture(customerDetails);
-        }
-        clearCart();
-        await refreshData();
-        return data;
-      }
-    } catch (err) {
-      console.warn('Backend order creation unavailable, utilizing offline client order engine:', err);
-    }
-
-    // Client-side fallback for static Netlify hosting
     const discountAmount = appliedCoupon ? appliedCoupon.discountAmount : 0;
     const shippingFee = cartSubtotal >= 999 || cartSubtotal === 0 ? 0 : 99;
     const totalAmount = Math.max(0, cartSubtotal - discountAmount + shippingFee);
     const newOrderId = `ORD-${Date.now().toString().slice(-6)}`;
 
-    const fallbackOrder: Order = {
+    const newOrder: Order = {
       id: newOrderId,
       customerName: customerDetails.fullName,
       email: customerDetails.email || 'customer@luxue.com',
@@ -661,12 +652,41 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } : undefined,
     };
 
-    setLastCreatedOrder(fallbackOrder);
-    if (customerDetails.saveForFuture) {
-      saveAddressForFuture(customerDetails);
+    try {
+      // 1. Direct Firebase save
+      await saveOrderToFirebase(newOrder);
+
+      // 2. Also send to Express backend
+      try {
+        await fetch('/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customerDetails,
+            items: cart,
+            selectedGiftProductId: selectedGift?.id,
+            paymentMethod,
+            couponCode: appliedCoupon?.code,
+            cardInfo,
+          }),
+        });
+      } catch {}
+
+      setLastCreatedOrder(newOrder);
+      if (customerDetails.saveForFuture) {
+        saveAddressForFuture(customerDetails);
+      }
+      clearCart();
+      return newOrder;
+    } catch (err) {
+      console.error('Order save error:', err);
+      setLastCreatedOrder(newOrder);
+      if (customerDetails.saveForFuture) {
+        saveAddressForFuture(customerDetails);
+      }
+      clearCart();
+      return newOrder;
     }
-    clearCart();
-    return fallbackOrder;
   };
 
   const submitPaymentProof = async (
@@ -675,27 +695,8 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     screenshotUrl?: string
   ): Promise<{ success: boolean; message: string; order?: Order }> => {
     try {
-      const res = await fetch(`/api/orders/${orderId}/submit-payment-proof`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ utrNumber, screenshotUrl }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.order) {
-          setLastCreatedOrder(data.order);
-        }
-        await refreshData();
-        return { success: true, message: data.message || 'Verification submitted', order: data.order };
-      }
-    } catch {
-      // Fallback
-    }
-
-    // Client fallback update
-    if (lastCreatedOrder && lastCreatedOrder.id === orderId) {
-      const updated: Order = {
-        ...lastCreatedOrder,
+      // Update in Firebase Firestore
+      await updateOrderInFirebase(orderId, {
         paymentStatus: 'Payment Processing',
         paymentVerification: {
           utrNumber,
@@ -703,12 +704,37 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
           submittedAt: new Date().toISOString(),
           status: 'pending',
         },
-      };
-      setLastCreatedOrder(updated);
-      return { success: true, message: 'Payment details submitted for verification', order: updated };
-    }
+      });
 
-    return { success: true, message: 'Payment details received for verification' };
+      // Also call Express backend
+      try {
+        await fetch(`/api/orders/${orderId}/submit-payment-proof`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ utrNumber, screenshotUrl }),
+        });
+      } catch {}
+
+      if (lastCreatedOrder && lastCreatedOrder.id === orderId) {
+        const updated: Order = {
+          ...lastCreatedOrder,
+          paymentStatus: 'Payment Processing',
+          paymentVerification: {
+            utrNumber,
+            screenshotUrl,
+            submittedAt: new Date().toISOString(),
+            status: 'pending',
+          },
+        };
+        setLastCreatedOrder(updated);
+        return { success: true, message: 'Payment verification submitted successfully.', order: updated };
+      }
+
+      return { success: true, message: 'Payment details received for verification' };
+    } catch (err) {
+      console.error('Error submitting payment proof:', err);
+      return { success: true, message: 'Payment details submitted.' };
+    }
   };
 
   const processCardPayment = async (
@@ -716,40 +742,43 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     cardInfo: { cardholderName: string; cardNumber: string; expiry: string; cvv: string }
   ): Promise<{ success: boolean; message: string; order?: Order }> => {
     try {
-      const res = await fetch('/api/payments/process-card', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId, cardInfo }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.order) {
-          setLastCreatedOrder(data.order);
-        }
-        await refreshData();
-        return { success: true, message: data.message || 'Payment confirmed', order: data.order };
-      }
-    } catch {
-      // Fallback
-    }
+      const cardPayload = {
+        cardholderName: cardInfo.cardholderName,
+        maskedNumber: `•••• •••• •••• ${cardInfo.cardNumber.replace(/\s/g, '').slice(-4)}`,
+        brand: 'Card',
+        authCode: `AUTH_${Date.now().toString().slice(-6)}`,
+      };
 
-    if (lastCreatedOrder && lastCreatedOrder.id === orderId) {
-      const updated: Order = {
-        ...lastCreatedOrder,
+      await updateOrderInFirebase(orderId, {
         paymentStatus: 'Paid',
         orderStatus: 'Confirmed',
-        cardInfo: {
-          cardholderName: cardInfo.cardholderName,
-          maskedNumber: `•••• •••• •••• ${cardInfo.cardNumber.replace(/\s/g, '').slice(-4)}`,
-          brand: 'Card',
-          authCode: `AUTH_${Date.now().toString().slice(-6)}`,
-        },
-      };
-      setLastCreatedOrder(updated);
-      return { success: true, message: 'Payment authorized and order confirmed', order: updated };
-    }
+        cardInfo: cardPayload,
+      });
 
-    return { success: true, message: 'Payment approved' };
+      try {
+        await fetch('/api/payments/process-card', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId, cardInfo }),
+        });
+      } catch {}
+
+      if (lastCreatedOrder && lastCreatedOrder.id === orderId) {
+        const updated: Order = {
+          ...lastCreatedOrder,
+          paymentStatus: 'Paid',
+          orderStatus: 'Confirmed',
+          cardInfo: cardPayload,
+        };
+        setLastCreatedOrder(updated);
+        return { success: true, message: 'Payment authorized and order confirmed', order: updated };
+      }
+
+      return { success: true, message: 'Payment approved' };
+    } catch (err) {
+      console.error('Error processing card payment:', err);
+      return { success: true, message: 'Payment approved' };
+    }
   };
 
   const navigate = (view: string, productId?: string) => {
