@@ -22,6 +22,7 @@ import { ContactPage } from './pages/ContactPage';
 
 import { AdminLoginPage } from './pages/Admin/AdminLoginPage';
 import { AdminDashboardPage } from './pages/Admin/AdminDashboardPage';
+import { HighlightViewerModal } from './components/Highlights/HighlightViewerModal';
 import { Loader2 } from 'lucide-react';
 
 const MainAppRouter: React.FC = () => {
@@ -186,6 +187,9 @@ const MainAppRouter: React.FC = () => {
           <MobileBottomNav />
         </>
       )}
+
+      {/* Global Interactive Lookbook & Highlights Story Viewer Modal */}
+      <HighlightViewerModal />
     </div>
   );
 };

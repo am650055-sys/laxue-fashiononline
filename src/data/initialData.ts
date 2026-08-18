@@ -1,5 +1,6 @@
 import { Product, Category, Coupon, RakhiOfferConfig, BannerConfig, Order, StoreSettings, PaymentSettingsRecord } from '../types';
 import { CATALOG_20_PRODUCTS } from './catalog20Products';
+import { NEW_15_PRODUCTS } from './new15Products';
 
 export const INITIAL_PAYMENT_SETTINGS: PaymentSettingsRecord = {
   upiId: 'testone@upi',
@@ -64,10 +65,101 @@ export const INITIAL_BANNERS: BannerConfig[] = [
 
 export const INITIAL_CATEGORIES: Category[] = [
   {
+    id: 'cat-embroidered-suit-set',
+    name: 'Embroidered Suit Set',
+    slug: 'embroidered-suit-set',
+    image: 'https://i.ibb.co/jktFxP4x/Made-for-moments-worth-celebrating-A-timeless-green-silhouette-with-intricate-embroidery-delica.jpg',
+    itemCount: 1,
+  },
+  {
+    id: 'cat-a-line-suit',
+    name: 'A-Line Suit',
+    slug: 'a-line-suit',
+    image: 'https://i.ibb.co/0RhfwdZR/Pleats-pearls-a-whole-lot-of-elegance-A-premium-A-line-suit-in-a-timeless-navy-blue-beautiful.jpg',
+    itemCount: 1,
+  },
+  {
+    id: 'cat-ethnic-suit-set',
+    name: 'Ethnic Suit Set',
+    slug: 'ethnic-suit-set',
+    image: 'https://i.ibb.co/Jj08jddp/Instagram-1786879347540-WEBP.webp',
+    itemCount: 2,
+  },
+  {
+    id: 'cat-casual-co-ord-set',
+    name: 'Casual Co-ord Set',
+    slug: 'casual-co-ord-set',
+    image: 'https://i.ibb.co/bg3XKfqj/Instagram-1786879430337-WEBP.webp',
+    itemCount: 1,
+  },
+  {
+    id: 'cat-fusion-suit',
+    name: 'Fusion Suit',
+    slug: 'fusion-suit',
+    image: 'https://i.ibb.co/QFL89Wwh/Instagram-1786879498573-WEBP.webp',
+    itemCount: 1,
+  },
+  {
+    id: 'cat-kurta-set',
+    name: 'Kurta Set',
+    slug: 'kurta-set',
+    image: 'https://i.ibb.co/x8sw9tL1/Instagram-1786879524714-WEBP.webp',
+    itemCount: 1,
+  },
+  {
     id: 'cat-anarkali-suit',
     name: 'Anarkali Suit',
     slug: 'anarkali-suit',
-    image: 'https://i.ibb.co/4RwtQWYD/A-Banaras-beauty-you-ll-cherish-Introducing-a-premium-navy-blue-Banaras-Anarkali-adorned-with-in.jpg',
+    image: 'https://i.ibb.co/wrcsMtMb/Instagram-1786879580064-WEBP.webp',
+    itemCount: 2,
+  },
+  {
+    id: 'cat-daily-wear-kurti-set',
+    name: 'Daily Wear Kurti Set',
+    slug: 'daily-wear-kurti-set',
+    image: 'https://i.ibb.co/v4CWbxxf/Instagram-1786879613861-WEBP.webp',
+    itemCount: 1,
+  },
+  {
+    id: 'cat-cotton-kurti',
+    name: 'Cotton Kurti',
+    slug: 'cotton-kurti',
+    image: 'https://i.ibb.co/Qj6P3vRs/Instagram-1786879652360-WEBP.webp',
+    itemCount: 1,
+  },
+  {
+    id: 'cat-festive-suit',
+    name: 'Festive Suit',
+    slug: 'festive-suit',
+    image: 'https://i.ibb.co/nMDmvJf7/Instagram-1786879713852-WEBP.webp',
+    itemCount: 1,
+  },
+  {
+    id: 'cat-silk-suit-set',
+    name: 'Silk Suit Set',
+    slug: 'silk-suit-set',
+    image: 'https://i.ibb.co/5gzJfLfP/Instagram-1786879759769-WEBP.webp',
+    itemCount: 1,
+  },
+  {
+    id: 'cat-straight-cut-suit',
+    name: 'Straight-Cut Suit',
+    slug: 'straight-cut-suit',
+    image: 'https://i.ibb.co/F42htLmB/Instagram-1786879783984-WEBP.webp',
+    itemCount: 1,
+  },
+  {
+    id: 'cat-flared-suit',
+    name: 'Flared Suit',
+    slug: 'flared-suit',
+    image: 'https://i.ibb.co/DH5D4rfX/Instagram-1786879807457-WEBP.webp',
+    itemCount: 1,
+  },
+  {
+    id: 'cat-smart-suit-set',
+    name: 'Smart Suit Set',
+    slug: 'smart-suit-set',
+    image: 'https://i.ibb.co/qLyPGfCP/Instagram-1786879832978-WEBP.webp',
     itemCount: 1,
   },
   {
@@ -185,7 +277,7 @@ export const INITIAL_COUPONS: Coupon[] = [
   },
 ];
 
-export const INITIAL_PRODUCTS: Product[] = CATALOG_20_PRODUCTS;
+export const INITIAL_PRODUCTS: Product[] = [...NEW_15_PRODUCTS, ...CATALOG_20_PRODUCTS];
 
 export const INITIAL_SAMPLE_ORDERS: Order[] = [
   {

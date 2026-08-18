@@ -1120,7 +1120,7 @@ const RAW_CATALOG_20_PRODUCTS: Product[] = [
 
 export const CATALOG_20_PRODUCTS: Product[] = RAW_CATALOG_20_PRODUCTS.map((prod, idx) => ({
   ...prod,
-  displayOrder: idx + 1,
+  displayOrder: idx + 16,
   published: true,
   status: 'published' as const,
   visibility: 'online' as const,

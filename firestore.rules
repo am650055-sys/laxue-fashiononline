@@ -32,6 +32,16 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // Customer Reviews Highlights Collection
+    match /customerReviews/{reviewId} {
+      allow read, write: if true;
+    }
+
+    // Promotional Highlights & Banners Collection
+    match /highlights/{highlightId} {
+      allow read, write: if true;
+    }
+
     // Default deny all other collections
     match /{document=**} {
       allow read, write: if false;

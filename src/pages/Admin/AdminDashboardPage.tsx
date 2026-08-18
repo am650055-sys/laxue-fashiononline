@@ -30,10 +30,13 @@ import {
   Loader2,
   Check,
   QrCode,
+  Sparkles,
 } from 'lucide-react';
 import { useShop } from '../../context/ShopContext';
 import { Product, Order, OrderStatus, Coupon, RakhiOfferConfig, StoreSettings, BannerConfig, Size } from '../../types';
 import { AdminPaymentSettings } from '../../components/admin/AdminPaymentSettings';
+import { AdminCustomerReviews } from '../../components/admin/AdminCustomerReviews';
+import { AdminHighlightsManager } from '../../components/Admin/AdminHighlightsManager';
 import {
   saveProductToFirebase,
   updateProductInFirebase,
@@ -46,10 +49,12 @@ import {
 
 export type AdminTab =
   | 'dashboard'
+  | 'highlights'
+  | 'payment-settings'
+  | 'reviews'
   | 'products'
   | 'categories'
   | 'orders'
-  | 'payment-settings'
   | 'customers'
   | 'inventory'
   | 'rakhi-offer'
@@ -71,10 +76,12 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ activeSu
       activeSubRoute &&
       [
         'dashboard',
+        'highlights',
+        'payment-settings',
+        'reviews',
         'products',
         'categories',
         'orders',
-        'payment-settings',
         'customers',
         'inventory',
         'rakhi-offer',
@@ -94,10 +101,12 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ activeSu
       activeSubRoute &&
       [
         'dashboard',
+        'highlights',
+        'payment-settings',
+        'reviews',
         'products',
         'categories',
         'orders',
-        'payment-settings',
         'customers',
         'inventory',
         'rakhi-offer',
@@ -801,7 +810,9 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ activeSu
 
   const tabList: { id: AdminTab; label: string; icon: React.FC<{ className?: string }> }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'highlights', label: 'Highlights & Banners CMS', icon: Layers },
     { id: 'payment-settings', label: 'Payment Settings (UPI)', icon: QrCode },
+    { id: 'reviews', label: 'Customer Stories / Reviews', icon: Sparkles },
     { id: 'orders', label: 'Orders & Verifications', icon: ShoppingBag },
     { id: 'products', label: 'Products Catalog', icon: Package },
     { id: 'categories', label: 'Categories', icon: Grid },
@@ -966,6 +977,14 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ activeSu
                   </button>
 
                   <button
+                    onClick={() => handleTabChange('highlights')}
+                    className="p-3.5 bg-[#1F060A] hover:bg-[#3B0C13] rounded-2xl border border-[#D4AF37]/40 text-xs font-bold text-[#DFBA67] flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                  >
+                    <Layers className="w-4 h-4 text-[#DFBA67]" />
+                    <span>Highlights & Stories CMS</span>
+                  </button>
+
+                  <button
                     onClick={() => handleTabChange('orders')}
                     className="p-3.5 bg-[#1F060A] hover:bg-[#3B0C13] rounded-2xl border border-[#D4AF37]/40 text-xs font-bold text-[#DFBA67] flex items-center justify-center gap-2 cursor-pointer transition-colors"
                   >
@@ -979,6 +998,14 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ activeSu
                   >
                     <QrCode className="w-4 h-4" />
                     <span>UPI & Payment Setup</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleTabChange('reviews')}
+                    className="p-3.5 bg-[#1F060A] hover:bg-[#3B0C13] rounded-2xl border border-[#D4AF37]/40 text-xs font-bold text-[#DFBA67] flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                  >
+                    <Sparkles className="w-4 h-4 text-[#DFBA67]" />
+                    <span>Customer Reviews (Stories)</span>
                   </button>
 
                   <button
@@ -1037,17 +1064,17 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ activeSu
                   onClick={handleSync20CatalogProducts}
                   disabled={isSyncingCatalog}
                   className="bg-[#1F060A] hover:bg-[#3B0C13] text-[#DFBA67] font-semibold text-xs px-3.5 py-2.5 rounded-xl border border-[#D4AF37]/50 flex items-center gap-1.5 cursor-pointer shadow transition-colors disabled:opacity-50"
-                  title="Push the complete 20 product catalog to Firebase"
+                  title="Push the complete 35 product catalog to Firebase Firestore"
                 >
                   {isSyncingCatalog ? (
                     <>
                       <Loader2 className="w-3.5 h-3.5 animate-spin text-[#DFBA67]" />
-                      <span>Syncing...</span>
+                      <span>Syncing Products...</span>
                     </>
                   ) : (
                     <>
                       <RefreshCw className="w-3.5 h-3.5 text-[#DFBA67]" />
-                      <span>Publish 20 Catalog Products</span>
+                      <span>Sync & Publish Complete Catalog</span>
                     </>
                   )}
                 </button>
@@ -1893,6 +1920,20 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ activeSu
           </div>
         )}
 
+        {/* 13. CUSTOMER REVIEWS HIGHLIGHTS (INSTAGRAM STORIES) */}
+        {activeTab === 'reviews' && (
+          <div className="space-y-6">
+            <AdminCustomerReviews />
+          </div>
+        )}
+
+        {/* 14. HIGHLIGHTS & LOOKBOOK STORIES CMS */}
+        {activeTab === 'highlights' && (
+          <div className="space-y-6">
+            <AdminHighlightsManager />
+          </div>
+        )}
+
       </div>
 
       {/* Product Add/Edit Modal */}
@@ -2017,14 +2058,42 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ activeSu
                       formErrors.category ? 'border-rose-500' : 'border-[#D4AF37]/40'
                     }`}
                   >
-                    <option value="Kurtis">Kurtis</option>
-                    <option value="Printed Kurtis">Printed Kurtis</option>
-                    <option value="Festive Kurtis">Festive Kurtis</option>
-                    <option value="Anarkali Kurtis">Anarkali Kurtis</option>
-                    <option value="Designer Kurtis">Designer Kurtis</option>
-                    <option value="Cotton Kurtis">Cotton Kurtis</option>
-                    <option value="Everyday Kurtis">Everyday Kurtis</option>
-                    <option value="Office Wear">Office Wear</option>
+                    {categories.length > 0 ? (
+                      categories.map(cat => (
+                        <option key={cat.id} value={cat.name}>
+                          {cat.name}
+                        </option>
+                      ))
+                    ) : (
+                      <>
+                        <option value="Embroidered Suit Set">Embroidered Suit Set</option>
+                        <option value="A-Line Suit">A-Line Suit</option>
+                        <option value="Ethnic Suit Set">Ethnic Suit Set</option>
+                        <option value="Casual Co-ord Set">Casual Co-ord Set</option>
+                        <option value="Fusion Suit">Fusion Suit</option>
+                        <option value="Kurta Set">Kurta Set</option>
+                        <option value="Anarkali Suit">Anarkali Suit</option>
+                        <option value="Daily Wear Kurti Set">Daily Wear Kurti Set</option>
+                        <option value="Cotton Kurti">Cotton Kurti</option>
+                        <option value="Festive Suit">Festive Suit</option>
+                        <option value="Silk Suit Set">Silk Suit Set</option>
+                        <option value="Straight-Cut Suit">Straight-Cut Suit</option>
+                        <option value="Flared Suit">Flared Suit</option>
+                        <option value="Smart Suit Set">Smart Suit Set</option>
+                        <option value="Salwar Suit">Salwar Suit</option>
+                        <option value="Vichitra Suit">Vichitra Suit</option>
+                        <option value="Alia Cut Suit">Alia Cut Suit</option>
+                        <option value="Sharara Set">Sharara Set</option>
+                        <option value="Silk Salwar Suit">Silk Salwar Suit</option>
+                        <option value="Floral Suit">Floral Suit</option>
+                        <option value="Cotton Kurtis">Cotton Kurtis</option>
+                        <option value="Designer Kurtis">Designer Kurtis</option>
+                        <option value="Everyday Kurtis">Everyday Kurtis</option>
+                        <option value="Printed Kurtis">Printed Kurtis</option>
+                        <option value="Festive Kurtis">Festive Kurtis</option>
+                        <option value="Office Wear">Office Wear</option>
+                      </>
+                    )}
                   </select>
                   {formErrors.category && (
                     <p className="text-rose-400 text-[11px] font-semibold mt-1 flex items-center gap-1">

@@ -1,11 +1,14 @@
 import React from 'react';
-import { ArrowRight, Sparkles, Gift } from 'lucide-react';
+import { ArrowRight, Sparkles, Gift, Flame, ShoppingBag } from 'lucide-react';
 import { useShop } from '../context/ShopContext';
 import { RakhiHeroBanner } from '../components/RakhiHeroBanner';
 import { TrustSection } from '../components/TrustSection';
+import { ProductCard } from '../components/ProductCard';
+import { CustomerReviewsHighlights } from '../components/CustomerReviewsHighlights';
+import { HighlightsSection } from '../components/Highlights/HighlightsSection';
 
 export const HomePage: React.FC = () => {
-  const { navigate, setActiveCategoryFilter } = useShop();
+  const { products, navigate, setActiveCategoryFilter } = useShop();
 
   const rakhiCategories = [
     {
@@ -34,9 +37,12 @@ export const HomePage: React.FC = () => {
       name: 'Gift Worthy Styles',
       subtitle: 'Anarkalis, Straight Cut Sets & Luxe Silk Dupattas',
       image: 'https://images.unsplash.com/photo-1513201099705-a9746e1e201f?auto=format&fit=crop&q=80&w=800',
-      categoryFilter: 'Anarkali Kurtis',
+      categoryFilter: 'Anarkali Suit',
     },
   ];
+
+  // Latest products from Firebase (15 new products appear first based on displayOrder / createdAt)
+  const newArrivals = products.slice(0, 15);
 
   return (
     <div className="space-y-10 sm:space-y-14 pb-12">
@@ -44,7 +50,50 @@ export const HomePage: React.FC = () => {
       {/* 1. Premium Rakhi Hero Banner (No Human / No Model) */}
       <RakhiHeroBanner />
 
-      {/* 2. Celebrate Rakhi With LUXUE - Premium Category Edits */}
+      {/* 2. Large Promotional Highlights & Lookbooks Section */}
+      <HighlightsSection />
+
+      {/* 3. Customer Reviews & Stories Highlights (Instagram Stories Format) */}
+      <CustomerReviewsHighlights />
+
+      {/* 3. New Arrivals / Latest Products Grid (New 15 Products First) */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 pb-4 border-b border-[#EAE3D2] gap-4">
+          <div>
+            <div className="inline-flex items-center gap-2 bg-[#5B0F15]/10 text-[#5B0F15] px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-[0.2em] border border-[#C5A059]/40 mb-2">
+              <Flame className="w-3.5 h-3.5 text-[#C5A059]" />
+              <span>JUST LAUNCHED • NEW ARRIVALS</span>
+            </div>
+            <h2 className="font-serif-luxury text-2xl sm:text-4xl font-bold text-[#3B0C13] tracking-tight">
+              LATEST FESTIVE & ETHNIC EDITS
+            </h2>
+            <p className="text-xs sm:text-sm text-[#7A695C] mt-1">
+              Explore our newest ₹799 launch collection with premium fabrics, embroidery & fast shipping.
+            </p>
+          </div>
+          
+          <button
+            onClick={() => {
+              setActiveCategoryFilter('All');
+              navigate('shop');
+            }}
+            className="inline-flex items-center gap-2 bg-[#4A0E17] text-[#DFBA67] px-5 py-2.5 rounded-full text-xs font-bold hover:bg-[#3B0C13] transition-colors border border-[#D4AF37] shadow-sm w-fit"
+          >
+            <ShoppingBag className="w-3.5 h-3.5" />
+            <span>VIEW ALL {products.length} STYLES</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        {/* Dynamic Products Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 md:gap-5">
+          {newArrivals.map(product => (
+            <ProductCard key={product.id} product={product} />
+          ))}
+        </div>
+      </section>
+
+      {/* 3. Celebrate Rakhi With LUXUE - Premium Category Edits */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-2xl mx-auto mb-10">
           <div className="inline-flex items-center gap-2 bg-[#5B0F15]/10 text-[#5B0F15] px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-[0.2em] border border-[#C5A059]/40 mb-3">
@@ -59,7 +108,7 @@ export const HomePage: React.FC = () => {
           </p>
         </div>
 
-        {/* 4 Premium Category Tiles (NOT Individual Product Cards) */}
+        {/* 4 Premium Category Tiles */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           {rakhiCategories.map(cat => (
             <div
@@ -105,7 +154,7 @@ export const HomePage: React.FC = () => {
         </div>
       </section>
 
-      {/* 3. Customer Trust Section */}
+      {/* 4. Customer Trust Section */}
       <TrustSection />
 
     </div>

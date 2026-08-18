@@ -12,7 +12,7 @@ import {
   where,
   writeBatch,
 } from './firebase';
-import { Product, Category, RakhiOfferConfig, StoreSettings, Order, Coupon, BannerConfig, PaymentSettingsRecord } from '../types';
+import { Product, Category, RakhiOfferConfig, StoreSettings, Order, Coupon, BannerConfig, PaymentSettingsRecord, CustomerReviewHighlight, Highlight, HighlightMediaItem } from '../types';
 import {
   INITIAL_PRODUCTS,
   INITIAL_CATEGORIES,
@@ -22,6 +22,8 @@ import {
   INITIAL_COUPONS,
   INITIAL_BANNERS,
 } from '../data/initialData';
+import { INITIAL_CUSTOMER_REVIEWS } from '../data/initialReviews';
+import { INITIAL_HIGHLIGHTS } from '../data/initialHighlights';
 
 const PRODUCTS_COLLECTION = 'products';
 const CATEGORIES_COLLECTION = 'categories';
@@ -29,12 +31,18 @@ const ORDERS_COLLECTION = 'orders';
 const SETTINGS_COLLECTION = 'settings';
 const COUPONS_COLLECTION = 'coupons';
 const BANNERS_COLLECTION = 'banners';
+const CUSTOMER_REVIEWS_COLLECTION = 'customerReviews';
+const HIGHLIGHTS_COLLECTION = 'highlights';
 
 /**
  * Seed initial catalog to Firestore if the collection is empty or missing products.
  */
 export async function seedFirestoreIfEmpty(): Promise<void> {
   try {
+    // Also seed reviews and highlights if needed
+    seedCustomerReviewsIfEmpty().catch(err => console.warn('[REVIEWS SEED ERROR]:', err));
+    seedHighlightsIfEmpty().catch(err => console.warn('[HIGHLIGHTS SEED ERROR]:', err));
+
     const productsRef = collection(db, PRODUCTS_COLLECTION);
     const snap = await getDocs(productsRef);
 
@@ -262,7 +270,11 @@ export function subscribeToProducts(
       callback(prods);
     },
     (err) => {
-      console.error('[FIRESTORE PRODUCT LISTENER ERROR]:', err);
+      // Suppress benign database closing / visibility change transitions
+      if (err?.message?.includes('closing') || err?.message?.includes('hidden')) {
+        return;
+      }
+      console.warn('[FIRESTORE PRODUCT LISTENER]:', err);
     }
   );
 }
@@ -412,7 +424,10 @@ export function subscribeToPaymentSettings(callback: (settings: PaymentSettingsR
       callback(snap.data() as PaymentSettingsRecord);
     }
   }, (err) => {
-    console.error('[FIRESTORE UPI LISTENER ERROR]:', err);
+    if (err?.message?.includes('closing') || err?.message?.includes('hidden')) {
+      return;
+    }
+    console.warn('[FIRESTORE UPI LISTENER]:', err);
   });
 }
 
@@ -475,7 +490,10 @@ export function subscribeToOrders(callback: (orders: Order[]) => void): () => vo
     orders.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
     callback(orders);
   }, (err) => {
-    console.error('[FIRESTORE ORDERS LISTENER ERROR]:', err);
+    if (err?.message?.includes('closing') || err?.message?.includes('hidden')) {
+      return;
+    }
+    console.warn('[FIRESTORE ORDERS LISTENER]:', err);
   });
 }
 
@@ -501,3 +519,365 @@ export async function updateOrderInFirebase(orderId: string, updates: Partial<Or
     updatedAt: new Date().toISOString(),
   });
 }
+
+// ==========================================
+// CUSTOMER REVIEWS HIGHLIGHTS FIRESTORE API
+// ==========================================
+
+/**
+ * Seed customer reviews to Firebase if collection is empty or missing initial items.
+ */
+export async function seedCustomerReviewsIfEmpty(): Promise<void> {
+  try {
+    const reviewsRef = collection(db, CUSTOMER_REVIEWS_COLLECTION);
+    const snap = await getDocs(reviewsRef);
+
+    if (snap.empty) {
+      console.log('[FIREBASE REVIEWS SEED] Seeding initial customer review highlights to Firestore...');
+      const batch = writeBatch(db);
+      INITIAL_CUSTOMER_REVIEWS.forEach((rev, idx) => {
+        const revRef = doc(db, CUSTOMER_REVIEWS_COLLECTION, rev.id);
+        batch.set(revRef, {
+          ...rev,
+          displayOrder: typeof rev.displayOrder === 'number' ? rev.displayOrder : idx + 1,
+          published: rev.published !== false,
+          createdAt: rev.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      });
+      await batch.commit();
+      console.log('[FIREBASE REVIEWS SEED] Successfully seeded customer review highlights!');
+    }
+  } catch (err) {
+    console.error('[FIREBASE REVIEWS SEED ERROR]:', err);
+  }
+}
+
+/**
+ * Real-time listener for customer reviews highlights.
+ */
+export function subscribeToCustomerReviews(callback: (reviews: CustomerReviewHighlight[]) => void): () => void {
+  const reviewsRef = collection(db, CUSTOMER_REVIEWS_COLLECTION);
+  return onSnapshot(
+    reviewsRef,
+    (snap) => {
+      const reviews: CustomerReviewHighlight[] = [];
+      snap.forEach((d) => {
+        const data = d.data() as CustomerReviewHighlight;
+        reviews.push({
+          ...data,
+          id: d.id,
+          media: Array.isArray(data.media) ? data.media : [],
+          displayOrder: typeof data.displayOrder === 'number' ? data.displayOrder : 999,
+          published: data.published !== false,
+        });
+      });
+
+      // Sort primarily by displayOrder ascending, then newest createdAt
+      reviews.sort((a, b) => {
+        if (a.displayOrder !== b.displayOrder) {
+          return a.displayOrder - b.displayOrder;
+        }
+        return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+      });
+
+      callback(reviews);
+    },
+    (err) => {
+      if (err?.message?.includes('closing') || err?.message?.includes('hidden')) {
+        return;
+      }
+      console.warn('[FIRESTORE REVIEWS LISTENER]:', err);
+    }
+  );
+}
+
+/**
+ * Fetch customer reviews once.
+ */
+export async function fetchCustomerReviewsFromFirebase(): Promise<CustomerReviewHighlight[]> {
+  try {
+    const reviewsRef = collection(db, CUSTOMER_REVIEWS_COLLECTION);
+    const snap = await getDocs(reviewsRef);
+    if (snap.empty) {
+      return INITIAL_CUSTOMER_REVIEWS;
+    }
+    const reviews: CustomerReviewHighlight[] = [];
+    snap.forEach((d) => {
+      reviews.push({ ...(d.data() as CustomerReviewHighlight), id: d.id });
+    });
+    reviews.sort((a, b) => (a.displayOrder || 999) - (b.displayOrder || 999));
+    return reviews;
+  } catch (err) {
+    console.error('[FIRESTORE FETCH REVIEWS ERROR]:', err);
+    return INITIAL_CUSTOMER_REVIEWS;
+  }
+}
+
+/**
+ * Create or overwrite a Customer Review Highlight.
+ */
+export async function saveCustomerReviewToFirebase(review: CustomerReviewHighlight): Promise<CustomerReviewHighlight> {
+  const reviewId = review.id || `rev-${Date.now()}`;
+  const reviewRef = doc(db, CUSTOMER_REVIEWS_COLLECTION, reviewId);
+  const dataToSave = {
+    ...review,
+    id: reviewId,
+    media: Array.isArray(review.media) ? review.media : [],
+    displayOrder: Number(review.displayOrder) || 1,
+    published: review.published !== false,
+    createdAt: review.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  await setDoc(reviewRef, dataToSave, { merge: true });
+  return dataToSave;
+}
+
+/**
+ * Update partial fields of a Customer Review Highlight.
+ */
+export async function updateCustomerReviewInFirebase(
+  reviewId: string,
+  updates: Partial<CustomerReviewHighlight>
+): Promise<void> {
+  const reviewRef = doc(db, CUSTOMER_REVIEWS_COLLECTION, reviewId);
+  await updateDoc(reviewRef, {
+    ...updates,
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+/**
+ * Delete a Customer Review Highlight from Firebase.
+ */
+export async function deleteCustomerReviewFromFirebase(reviewId: string): Promise<void> {
+  const reviewRef = doc(db, CUSTOMER_REVIEWS_COLLECTION, reviewId);
+  await deleteDoc(reviewRef);
+}
+
+/**
+ * Sync / reset all initial customer reviews into Firestore.
+ */
+export async function syncAllInitialCustomerReviews(): Promise<void> {
+  const batch = writeBatch(db);
+  INITIAL_CUSTOMER_REVIEWS.forEach((rev, idx) => {
+    const revRef = doc(db, CUSTOMER_REVIEWS_COLLECTION, rev.id);
+    batch.set(revRef, {
+      ...rev,
+      displayOrder: idx + 1,
+      published: true,
+      updatedAt: new Date().toISOString(),
+    }, { merge: true });
+  });
+  await batch.commit();
+}
+
+/**
+ * Seed initial Highlights CMS records if empty.
+ */
+export async function seedHighlightsIfEmpty(): Promise<void> {
+  try {
+    const hlRef = collection(db, HIGHLIGHTS_COLLECTION);
+    const snap = await getDocs(hlRef);
+    if (snap.empty) {
+      console.log('[FIREBASE SEED] Seeding initial promotional highlights...');
+      const batch = writeBatch(db);
+      INITIAL_HIGHLIGHTS.forEach((hl, idx) => {
+        const docRef = doc(db, HIGHLIGHTS_COLLECTION, hl.id);
+        batch.set(docRef, {
+          ...hl,
+          displayOrder: idx + 1,
+          published: hl.published !== false,
+          featured: hl.featured !== false,
+          views: hl.views || 0,
+          clicks: hl.clicks || 0,
+          createdAt: hl.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      });
+      await batch.commit();
+      console.log('[FIREBASE SEED] Successfully seeded initial highlights.');
+    }
+  } catch (err) {
+    console.error('[FIREBASE SEED HIGHLIGHTS ERROR]:', err);
+  }
+}
+
+/**
+ * Subscribe in real-time to Highlights.
+ */
+export function subscribeToHighlights(
+  callback: (highlights: Highlight[]) => void
+): () => void {
+  const hlRef = collection(db, HIGHLIGHTS_COLLECTION);
+  return onSnapshot(
+    hlRef,
+    (snap) => {
+      const highlights: Highlight[] = [];
+      snap.forEach((d) => {
+        const data = d.data() as Highlight;
+        highlights.push({
+          ...data,
+          id: d.id,
+          media: Array.isArray(data.media) ? data.media : [],
+          displayOrder: typeof data.displayOrder === 'number' ? data.displayOrder : 999,
+          views: typeof data.views === 'number' ? data.views : 0,
+          clicks: typeof data.clicks === 'number' ? data.clicks : 0,
+        });
+      });
+      highlights.sort((a, b) => (a.displayOrder || 999) - (b.displayOrder || 999));
+      callback(highlights);
+    },
+    (err) => {
+      console.error('[FIRESTORE HIGHLIGHTS SNAPSHOT ERROR]:', err);
+      callback(INITIAL_HIGHLIGHTS);
+    }
+  );
+}
+
+/**
+ * Fetch all Highlights once from Firestore.
+ */
+export async function fetchHighlightsFromFirebase(): Promise<Highlight[]> {
+  try {
+    const hlRef = collection(db, HIGHLIGHTS_COLLECTION);
+    const snap = await getDocs(hlRef);
+    if (snap.empty) {
+      return INITIAL_HIGHLIGHTS;
+    }
+    const list: Highlight[] = [];
+    snap.forEach((d) => {
+      const data = d.data() as Highlight;
+      list.push({
+        ...data,
+        id: d.id,
+        media: Array.isArray(data.media) ? data.media : [],
+        displayOrder: typeof data.displayOrder === 'number' ? data.displayOrder : 999,
+        views: typeof data.views === 'number' ? data.views : 0,
+        clicks: typeof data.clicks === 'number' ? data.clicks : 0,
+      });
+    });
+    list.sort((a, b) => (a.displayOrder || 999) - (b.displayOrder || 999));
+    return list;
+  } catch (err) {
+    console.error('[FIRESTORE FETCH HIGHLIGHTS ERROR]:', err);
+    return INITIAL_HIGHLIGHTS;
+  }
+}
+
+/**
+ * Create or save a Highlight in Firestore.
+ */
+export async function saveHighlightToFirebase(highlight: Highlight): Promise<Highlight> {
+  const highlightId = highlight.id || `hl-${Date.now()}`;
+  const hlRef = doc(db, HIGHLIGHTS_COLLECTION, highlightId);
+  const dataToSave: Highlight = {
+    ...highlight,
+    id: highlightId,
+    name: highlight.name.trim(),
+    title: highlight.title?.trim() || '',
+    description: highlight.description?.trim() || '',
+    buttonText: highlight.buttonText?.trim() || '',
+    buttonLink: highlight.buttonLink?.trim() || '',
+    coverImage: highlight.coverImage?.trim() || '',
+    displayOrder: Number(highlight.displayOrder) || 1,
+    published: highlight.published !== false,
+    featured: highlight.featured === true,
+    views: typeof highlight.views === 'number' ? highlight.views : 0,
+    clicks: typeof highlight.clicks === 'number' ? highlight.clicks : 0,
+    media: Array.isArray(highlight.media) ? highlight.media : [],
+    createdAt: highlight.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  await setDoc(hlRef, dataToSave, { merge: true });
+  return dataToSave;
+}
+
+/**
+ * Update partial fields of a Highlight in Firestore.
+ */
+export async function updateHighlightInFirebase(
+  highlightId: string,
+  updates: Partial<Highlight>
+): Promise<void> {
+  const hlRef = doc(db, HIGHLIGHTS_COLLECTION, highlightId);
+  await updateDoc(hlRef, {
+    ...updates,
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+/**
+ * Delete a Highlight completely from Firestore.
+ */
+export async function deleteHighlightFromFirebase(highlightId: string): Promise<void> {
+  const hlRef = doc(db, HIGHLIGHTS_COLLECTION, highlightId);
+  await deleteDoc(hlRef);
+}
+
+/**
+ * Batch update displayOrder for an entire list of Highlights (e.g. after drag-and-drop).
+ */
+export async function reorderHighlightsInFirebase(reorderedList: Highlight[]): Promise<void> {
+  const batch = writeBatch(db);
+  reorderedList.forEach((hl, idx) => {
+    const hlRef = doc(db, HIGHLIGHTS_COLLECTION, hl.id);
+    batch.update(hlRef, {
+      displayOrder: idx + 1,
+      updatedAt: new Date().toISOString(),
+    });
+  });
+  await batch.commit();
+}
+
+/**
+ * Increment view count for a highlight.
+ */
+export async function incrementHighlightViews(highlightId: string): Promise<void> {
+  try {
+    const hlRef = doc(db, HIGHLIGHTS_COLLECTION, highlightId);
+    const snap = await getDoc(hlRef);
+    if (snap.exists()) {
+      const current = snap.data()?.views || 0;
+      await updateDoc(hlRef, { views: current + 1 });
+    }
+  } catch (err) {
+    // Non-blocking
+  }
+}
+
+/**
+ * Increment click count for a highlight button or interaction.
+ */
+export async function incrementHighlightClicks(highlightId: string): Promise<void> {
+  try {
+    const hlRef = doc(db, HIGHLIGHTS_COLLECTION, highlightId);
+    const snap = await getDoc(hlRef);
+    if (snap.exists()) {
+      const current = snap.data()?.clicks || 0;
+      await updateDoc(hlRef, { clicks: current + 1 });
+    }
+  } catch (err) {
+    // Non-blocking
+  }
+}
+
+/**
+ * Sync / restore initial sample Highlights into Firestore.
+ */
+export async function syncAllInitialHighlights(): Promise<void> {
+  const batch = writeBatch(db);
+  INITIAL_HIGHLIGHTS.forEach((hl, idx) => {
+    const hlRef = doc(db, HIGHLIGHTS_COLLECTION, hl.id);
+    batch.set(hlRef, {
+      ...hl,
+      displayOrder: idx + 1,
+      published: true,
+      featured: hl.featured !== false,
+      updatedAt: new Date().toISOString(),
+    }, { merge: true });
+  });
+  await batch.commit();
+}
+
+

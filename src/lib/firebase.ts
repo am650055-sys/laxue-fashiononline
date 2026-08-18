@@ -1,5 +1,7 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
+  initializeFirestore,
+  memoryLocalCache,
   getFirestore,
   collection,
   doc,
@@ -14,6 +16,7 @@ import {
   orderBy,
   serverTimestamp,
   writeBatch,
+  Firestore,
 } from 'firebase/firestore';
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, User } from 'firebase/auth';
 import firebaseConfig from '../../firebase-applet-config.json';
@@ -21,11 +24,20 @@ import firebaseConfig from '../../firebase-applet-config.json';
 // Initialize Firebase App
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// Initialize Firestore
-// Use specified databaseId if available in config or default
-const db = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)'
-  ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
-  : getFirestore(app);
+// Initialize Firestore with memory cache to avoid "Database is closing/hidden" IndexedDB errors in iframes/tabs
+const databaseId = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)'
+  ? firebaseConfig.firestoreDatabaseId
+  : undefined;
+
+let db: Firestore;
+try {
+  db = initializeFirestore(app, {
+    localCache: memoryLocalCache(),
+  }, databaseId);
+} catch {
+  // If already initialized, retrieve existing Firestore instance
+  db = databaseId ? getFirestore(app, databaseId) : getFirestore(app);
+}
 
 // Initialize Firebase Auth
 const auth = getAuth(app);

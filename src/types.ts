@@ -168,6 +168,30 @@ export interface BannerConfig {
   imageUrl: string;
 }
 
+export interface ReviewMediaItem {
+  id: string;
+  type: 'image' | 'video';
+  url: string;
+  thumbnailUrl?: string;
+  caption?: string;
+  order: number;
+}
+
+export interface CustomerReviewHighlight {
+  id: string;
+  customerName: string;
+  location?: string;
+  reviewText: string;
+  rating: number;
+  coverImage: string;
+  isVerified?: boolean;
+  media: ReviewMediaItem[];
+  published: boolean;
+  displayOrder: number;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export interface Review {
   id: string;
   productId: string;
@@ -232,3 +256,32 @@ export interface StoreSettings {
   merchantName?: string;
   paymentSettings?: PaymentGatewaySettings;
 }
+
+export interface HighlightMediaItem {
+  id: string;
+  type: 'image' | 'video';
+  url: string;
+  thumbnailUrl?: string;
+  caption?: string;
+  displayOrder: number;
+  createdAt?: string;
+}
+
+export interface Highlight {
+  id: string;
+  name: string; // e.g. "Festive Collection", "New Arrivals", "Silk Collection"
+  coverImage: string; // Large banner image
+  title: string; // Headline e.g. "Celebrate In Style"
+  description: string; // Short description
+  buttonText: string; // e.g. "SHOP NOW"
+  buttonLink: string; // e.g. "/category/festive" or "/shop"
+  displayOrder: number; // 1, 2, 3...
+  published: boolean; // true = visible, false = draft / hidden
+  featured: boolean; // true = highlighted in hero promotional bar
+  views?: number;
+  clicks?: number;
+  media: HighlightMediaItem[];
+  createdAt: string;
+  updatedAt?: string;
+}
+
