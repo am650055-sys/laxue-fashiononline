@@ -12,7 +12,7 @@ import {
   where,
   writeBatch,
 } from './firebase';
-import { Product, Category, RakhiOfferConfig, StoreSettings, Order, Coupon, BannerConfig, PaymentSettingsRecord, CustomerReviewHighlight, Highlight, HighlightMediaItem } from '../types';
+import { Product, Category, RakhiOfferConfig, StoreSettings, Order, Coupon, BannerConfig, PaymentSettingsRecord, Highlight, HighlightMediaItem } from '../types';
 import {
   INITIAL_PRODUCTS,
   INITIAL_CATEGORIES,
@@ -22,7 +22,6 @@ import {
   INITIAL_COUPONS,
   INITIAL_BANNERS,
 } from '../data/initialData';
-import { INITIAL_CUSTOMER_REVIEWS } from '../data/initialReviews';
 import { INITIAL_HIGHLIGHTS } from '../data/initialHighlights';
 
 const PRODUCTS_COLLECTION = 'products';
@@ -31,7 +30,6 @@ const ORDERS_COLLECTION = 'orders';
 const SETTINGS_COLLECTION = 'settings';
 const COUPONS_COLLECTION = 'coupons';
 const BANNERS_COLLECTION = 'banners';
-const CUSTOMER_REVIEWS_COLLECTION = 'customerReviews';
 const HIGHLIGHTS_COLLECTION = 'highlights';
 
 /**
@@ -43,9 +41,18 @@ export async function seedFirestoreIfEmpty(): Promise<void> {
     const setSnap = await getDoc(settingsDoc);
     const configData = setSnap.exists() ? setSnap.data() : null;
 
-    // Seed customer reviews if not yet seeded
-    if (!configData?.reviews_seeded) {
-      seedCustomerReviewsIfEmpty().catch(err => console.warn('[REVIEWS SEED ERROR]:', err));
+    // Clean up legacy customerReviews collection if present
+    try {
+      const oldReviewsRef = collection(db, 'customerReviews');
+      const oldSnap = await getDocs(oldReviewsRef);
+      if (!oldSnap.empty) {
+        console.log(`[FIREBASE CLEANUP] Purging ${oldSnap.docs.length} obsolete customerReviews records.`);
+        const batch = writeBatch(db);
+        oldSnap.docs.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+      }
+    } catch (e) {
+      // Non-blocking cleanup
     }
 
     // Seed highlights if not yet seeded
@@ -531,156 +538,8 @@ export async function updateOrderInFirebase(orderId: string, updates: Partial<Or
 }
 
 // ==========================================
-// CUSTOMER REVIEWS HIGHLIGHTS FIRESTORE API
+// HIGHLIGHTS & STORIES FIRESTORE API
 // ==========================================
-
-/**
- * Seed customer reviews to Firebase if collection is empty or missing initial items.
- */
-export async function seedCustomerReviewsIfEmpty(): Promise<void> {
-  try {
-    const reviewsRef = collection(db, CUSTOMER_REVIEWS_COLLECTION);
-    const snap = await getDocs(reviewsRef);
-
-    if (snap.empty) {
-      console.log('[FIREBASE REVIEWS SEED] Seeding initial customer review highlights to Firestore...');
-      const batch = writeBatch(db);
-      INITIAL_CUSTOMER_REVIEWS.forEach((rev, idx) => {
-        const revRef = doc(db, CUSTOMER_REVIEWS_COLLECTION, rev.id);
-        batch.set(revRef, {
-          ...rev,
-          displayOrder: typeof rev.displayOrder === 'number' ? rev.displayOrder : idx + 1,
-          published: rev.published !== false,
-          createdAt: rev.createdAt || new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
-      });
-      await batch.commit();
-      console.log('[FIREBASE REVIEWS SEED] Successfully seeded customer review highlights!');
-    }
-  } catch (err) {
-    console.error('[FIREBASE REVIEWS SEED ERROR]:', err);
-  }
-}
-
-/**
- * Real-time listener for customer reviews highlights.
- */
-export function subscribeToCustomerReviews(callback: (reviews: CustomerReviewHighlight[]) => void): () => void {
-  const reviewsRef = collection(db, CUSTOMER_REVIEWS_COLLECTION);
-  return onSnapshot(
-    reviewsRef,
-    (snap) => {
-      const reviews: CustomerReviewHighlight[] = [];
-      snap.forEach((d) => {
-        const data = d.data() as CustomerReviewHighlight;
-        reviews.push({
-          ...data,
-          id: d.id,
-          media: Array.isArray(data.media) ? data.media : [],
-          displayOrder: typeof data.displayOrder === 'number' ? data.displayOrder : 999,
-          published: data.published !== false,
-        });
-      });
-
-      // Sort primarily by displayOrder ascending, then newest createdAt
-      reviews.sort((a, b) => {
-        if (a.displayOrder !== b.displayOrder) {
-          return a.displayOrder - b.displayOrder;
-        }
-        return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
-      });
-
-      callback(reviews);
-    },
-    (err) => {
-      if (err?.message?.includes('closing') || err?.message?.includes('hidden')) {
-        return;
-      }
-      console.warn('[FIRESTORE REVIEWS LISTENER]:', err);
-    }
-  );
-}
-
-/**
- * Fetch customer reviews once.
- */
-export async function fetchCustomerReviewsFromFirebase(): Promise<CustomerReviewHighlight[]> {
-  try {
-    const reviewsRef = collection(db, CUSTOMER_REVIEWS_COLLECTION);
-    const snap = await getDocs(reviewsRef);
-    if (snap.empty) {
-      return INITIAL_CUSTOMER_REVIEWS;
-    }
-    const reviews: CustomerReviewHighlight[] = [];
-    snap.forEach((d) => {
-      reviews.push({ ...(d.data() as CustomerReviewHighlight), id: d.id });
-    });
-    reviews.sort((a, b) => (a.displayOrder || 999) - (b.displayOrder || 999));
-    return reviews;
-  } catch (err) {
-    console.error('[FIRESTORE FETCH REVIEWS ERROR]:', err);
-    return INITIAL_CUSTOMER_REVIEWS;
-  }
-}
-
-/**
- * Create or overwrite a Customer Review Highlight.
- */
-export async function saveCustomerReviewToFirebase(review: CustomerReviewHighlight): Promise<CustomerReviewHighlight> {
-  const reviewId = review.id || `rev-${Date.now()}`;
-  const reviewRef = doc(db, CUSTOMER_REVIEWS_COLLECTION, reviewId);
-  const dataToSave = {
-    ...review,
-    id: reviewId,
-    media: Array.isArray(review.media) ? review.media : [],
-    displayOrder: Number(review.displayOrder) || 1,
-    published: review.published !== false,
-    createdAt: review.createdAt || new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-  await setDoc(reviewRef, dataToSave, { merge: true });
-  return dataToSave;
-}
-
-/**
- * Update partial fields of a Customer Review Highlight.
- */
-export async function updateCustomerReviewInFirebase(
-  reviewId: string,
-  updates: Partial<CustomerReviewHighlight>
-): Promise<void> {
-  const reviewRef = doc(db, CUSTOMER_REVIEWS_COLLECTION, reviewId);
-  await updateDoc(reviewRef, {
-    ...updates,
-    updatedAt: new Date().toISOString(),
-  });
-}
-
-/**
- * Delete a Customer Review Highlight from Firebase.
- */
-export async function deleteCustomerReviewFromFirebase(reviewId: string): Promise<void> {
-  const reviewRef = doc(db, CUSTOMER_REVIEWS_COLLECTION, reviewId);
-  await deleteDoc(reviewRef);
-}
-
-/**
- * Sync / reset all initial customer reviews into Firestore.
- */
-export async function syncAllInitialCustomerReviews(): Promise<void> {
-  const batch = writeBatch(db);
-  INITIAL_CUSTOMER_REVIEWS.forEach((rev, idx) => {
-    const revRef = doc(db, CUSTOMER_REVIEWS_COLLECTION, rev.id);
-    batch.set(revRef, {
-      ...rev,
-      displayOrder: idx + 1,
-      published: true,
-      updatedAt: new Date().toISOString(),
-    }, { merge: true });
-  });
-  await batch.commit();
-}
 
 /**
  * Seed initial Highlights CMS records if empty.

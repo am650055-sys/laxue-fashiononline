@@ -168,26 +168,32 @@ export interface BannerConfig {
   imageUrl: string;
 }
 
-export interface ReviewMediaItem {
+export interface HighlightMediaItem {
   id: string;
   type: 'image' | 'video';
   url: string;
   thumbnailUrl?: string;
   caption?: string;
-  order: number;
+  displayOrder: number;
+  order?: number;
+  createdAt?: string;
 }
 
-export interface CustomerReviewHighlight {
+export interface Highlight {
   id: string;
-  customerName: string;
-  location?: string;
-  reviewText: string;
-  rating: number;
-  coverImage: string;
-  isVerified?: boolean;
-  media: ReviewMediaItem[];
-  published: boolean;
-  displayOrder: number;
+  name: string; // Highlight Name e.g. "Customer Reviews", "Festive Collection", "New Arrivals"
+  title?: string; // Optional title/headline
+  description?: string; // Optional short description/subtitle
+  coverImage: string; // Direct banner/cover image URL
+  buttonText?: string; // Optional CTA button text e.g. "VIEW STORY" or "SHOP NOW"
+  buttonLink?: string; // Optional link e.g. "/shop" or "/category/festive"
+  displayOrder: number; // 1, 2, 3...
+  order?: number; // Alias for displayOrder
+  published: boolean; // true = visible on storefront, false = unpublished/draft
+  featured?: boolean; // optional featured indicator
+  views?: number;
+  clicks?: number;
+  media: HighlightMediaItem[]; // Multiple images and videos
   createdAt: string;
   updatedAt?: string;
 }
@@ -255,33 +261,5 @@ export interface StoreSettings {
   merchantUpiId?: string;
   merchantName?: string;
   paymentSettings?: PaymentGatewaySettings;
-}
-
-export interface HighlightMediaItem {
-  id: string;
-  type: 'image' | 'video';
-  url: string;
-  thumbnailUrl?: string;
-  caption?: string;
-  displayOrder: number;
-  createdAt?: string;
-}
-
-export interface Highlight {
-  id: string;
-  name: string; // e.g. "Festive Collection", "New Arrivals", "Silk Collection"
-  coverImage: string; // Large banner image
-  title: string; // Headline e.g. "Celebrate In Style"
-  description: string; // Short description
-  buttonText: string; // e.g. "SHOP NOW"
-  buttonLink: string; // e.g. "/category/festive" or "/shop"
-  displayOrder: number; // 1, 2, 3...
-  published: boolean; // true = visible, false = draft / hidden
-  featured: boolean; // true = highlighted in hero promotional bar
-  views?: number;
-  clicks?: number;
-  media: HighlightMediaItem[];
-  createdAt: string;
-  updatedAt?: string;
 }
 

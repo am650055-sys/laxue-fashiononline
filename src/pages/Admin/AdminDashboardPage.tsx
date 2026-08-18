@@ -35,7 +35,6 @@ import {
 import { useShop } from '../../context/ShopContext';
 import { Product, Order, OrderStatus, Coupon, RakhiOfferConfig, StoreSettings, BannerConfig, Size } from '../../types';
 import { AdminPaymentSettings } from '../../components/admin/AdminPaymentSettings';
-import { AdminCustomerReviews } from '../../components/admin/AdminCustomerReviews';
 import { AdminHighlightsManager } from '../../components/Admin/AdminHighlightsManager';
 import {
   saveProductToFirebase,
@@ -1920,15 +1919,8 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ activeSu
           </div>
         )}
 
-        {/* 13. CUSTOMER REVIEWS HIGHLIGHTS (INSTAGRAM STORIES) */}
-        {activeTab === 'reviews' && (
-          <div className="space-y-6">
-            <AdminCustomerReviews />
-          </div>
-        )}
-
-        {/* 14. HIGHLIGHTS & LOOKBOOK STORIES CMS */}
-        {activeTab === 'highlights' && (
+        {/* 13. CUSTOMER REVIEWS & HIGHLIGHTS CMS */}
+        {(activeTab === 'reviews' || activeTab === 'highlights') && (
           <div className="space-y-6">
             <AdminHighlightsManager />
           </div>

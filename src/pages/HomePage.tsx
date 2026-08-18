@@ -4,7 +4,6 @@ import { useShop } from '../context/ShopContext';
 import { RakhiHeroBanner } from '../components/RakhiHeroBanner';
 import { TrustSection } from '../components/TrustSection';
 import { ProductCard } from '../components/ProductCard';
-import { CustomerReviewsHighlights } from '../components/CustomerReviewsHighlights';
 import { HighlightsSection } from '../components/Highlights/HighlightsSection';
 
 export const HomePage: React.FC = () => {
@@ -50,11 +49,8 @@ export const HomePage: React.FC = () => {
       {/* 1. Premium Rakhi Hero Banner (No Human / No Model) */}
       <RakhiHeroBanner />
 
-      {/* 2. Large Promotional Highlights & Lookbooks Section */}
+      {/* 2. Highlights & Stories Showcase (Customer Reviews, Collections, Lookbooks) */}
       <HighlightsSection />
-
-      {/* 3. Customer Reviews & Stories Highlights (Instagram Stories Format) */}
-      <CustomerReviewsHighlights />
 
       {/* 3. New Arrivals / Latest Products Grid (New 15 Products First) */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

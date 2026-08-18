@@ -9,7 +9,6 @@ import {
   Size,
   StoreSettings,
   UserProfile,
-  CustomerReviewHighlight,
   Highlight,
 } from '../types';
 import {
@@ -18,13 +17,11 @@ import {
   INITIAL_RAKHI_OFFER,
   INITIAL_SETTINGS,
 } from '../data/initialData';
-import { INITIAL_CUSTOMER_REVIEWS } from '../data/initialReviews';
 import { INITIAL_HIGHLIGHTS } from '../data/initialHighlights';
 import {
   seedFirestoreIfEmpty,
   subscribeToProducts,
   subscribeToPaymentSettings,
-  subscribeToCustomerReviews,
   subscribeToHighlights,
   incrementHighlightViews,
   savePaymentSettingsToFirebase,
@@ -37,10 +34,6 @@ interface ShopContextType {
   categories: Category[];
   rakhiOffer: RakhiOfferConfig;
   settings: StoreSettings;
-  customerReviews: CustomerReviewHighlight[];
-  activeReviewHighlight: CustomerReviewHighlight | null;
-  openReviewHighlight: (review: CustomerReviewHighlight) => void;
-  closeReviewHighlight: () => void;
   highlights: Highlight[];
   activeHighlight: Highlight | null;
   openHighlightViewer: (highlight: Highlight) => void;
@@ -219,19 +212,9 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discountAmount: number } | null>(null);
   const [couponError, setCouponError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [customerReviews, setCustomerReviews] = useState<CustomerReviewHighlight[]>(INITIAL_CUSTOMER_REVIEWS);
-  const [activeReviewHighlight, setActiveReviewHighlight] = useState<CustomerReviewHighlight | null>(null);
 
   const [highlights, setHighlights] = useState<Highlight[]>(INITIAL_HIGHLIGHTS);
   const [activeHighlight, setActiveHighlight] = useState<Highlight | null>(null);
-
-  const openReviewHighlight = (review: CustomerReviewHighlight) => {
-    setActiveReviewHighlight(review);
-  };
-
-  const closeReviewHighlight = () => {
-    setActiveReviewHighlight(null);
-  };
 
   const openHighlightViewer = (highlight: Highlight) => {
     setActiveHighlight(highlight);
@@ -248,7 +231,6 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     let unsubscribeProducts: (() => void) | undefined;
     let unsubscribeUPI: (() => void) | undefined;
-    let unsubscribeReviews: (() => void) | undefined;
     let unsubscribeHighlights: (() => void) | undefined;
 
     const setupFirestoreSync = async () => {
@@ -263,12 +245,7 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setIsLoading(false);
         });
 
-        // Subscribe to real-time customer reviews highlights
-        unsubscribeReviews = subscribeToCustomerReviews((liveReviews) => {
-          setCustomerReviews(Array.isArray(liveReviews) ? liveReviews : []);
-        });
-
-        // Subscribe to real-time promotional highlights
+        // Subscribe to real-time promotional highlights & stories
         unsubscribeHighlights = subscribeToHighlights((liveHighlights) => {
           setHighlights(Array.isArray(liveHighlights) ? liveHighlights : []);
         });
@@ -308,7 +285,6 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       if (unsubscribeProducts) unsubscribeProducts();
       if (unsubscribeUPI) unsubscribeUPI();
-      if (unsubscribeReviews) unsubscribeReviews();
       if (unsubscribeHighlights) unsubscribeHighlights();
     };
   }, []);
@@ -858,10 +834,6 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
         categories,
         rakhiOffer,
         settings,
-        customerReviews,
-        activeReviewHighlight,
-        openReviewHighlight,
-        closeReviewHighlight,
         highlights,
         activeHighlight,
         openHighlightViewer,
