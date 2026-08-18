@@ -265,16 +265,12 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // Subscribe to real-time customer reviews highlights
         unsubscribeReviews = subscribeToCustomerReviews((liveReviews) => {
-          if (liveReviews && liveReviews.length > 0) {
-            setCustomerReviews(liveReviews);
-          }
+          setCustomerReviews(Array.isArray(liveReviews) ? liveReviews : []);
         });
 
         // Subscribe to real-time promotional highlights
         unsubscribeHighlights = subscribeToHighlights((liveHighlights) => {
-          if (liveHighlights && liveHighlights.length > 0) {
-            setHighlights(liveHighlights);
-          }
+          setHighlights(Array.isArray(liveHighlights) ? liveHighlights : []);
         });
 
         // Subscribe to real-time UPI & payment configuration

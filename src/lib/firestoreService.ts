@@ -39,9 +39,19 @@ const HIGHLIGHTS_COLLECTION = 'highlights';
  */
 export async function seedFirestoreIfEmpty(): Promise<void> {
   try {
-    // Also seed reviews and highlights if needed
-    seedCustomerReviewsIfEmpty().catch(err => console.warn('[REVIEWS SEED ERROR]:', err));
-    seedHighlightsIfEmpty().catch(err => console.warn('[HIGHLIGHTS SEED ERROR]:', err));
+    const settingsDoc = doc(db, SETTINGS_COLLECTION, 'store_config');
+    const setSnap = await getDoc(settingsDoc);
+    const configData = setSnap.exists() ? setSnap.data() : null;
+
+    // Seed customer reviews if not yet seeded
+    if (!configData?.reviews_seeded) {
+      seedCustomerReviewsIfEmpty().catch(err => console.warn('[REVIEWS SEED ERROR]:', err));
+    }
+
+    // Seed highlights if not yet seeded
+    if (!configData?.highlights_seeded) {
+      seedHighlightsIfEmpty().catch(err => console.warn('[HIGHLIGHTS SEED ERROR]:', err));
+    }
 
     const productsRef = collection(db, PRODUCTS_COLLECTION);
     const snap = await getDocs(productsRef);
@@ -109,11 +119,11 @@ export async function seedFirestoreIfEmpty(): Promise<void> {
     }
 
     // Seed Settings & Payment Settings
-    const settingsDoc = doc(db, SETTINGS_COLLECTION, 'store_config');
-    const setSnap = await getDoc(settingsDoc);
     if (!setSnap.exists()) {
       await setDoc(settingsDoc, {
         ...INITIAL_SETTINGS,
+        highlights_seeded: true,
+        reviews_seeded: true,
         updatedAt: new Date().toISOString(),
       });
     }
@@ -723,14 +733,18 @@ export function subscribeToHighlights(
           displayOrder: typeof data.displayOrder === 'number' ? data.displayOrder : 999,
           views: typeof data.views === 'number' ? data.views : 0,
           clicks: typeof data.clicks === 'number' ? data.clicks : 0,
+          published: data.published !== false,
+          featured: data.featured === true,
         });
       });
       highlights.sort((a, b) => (a.displayOrder || 999) - (b.displayOrder || 999));
       callback(highlights);
     },
     (err) => {
-      console.error('[FIRESTORE HIGHLIGHTS SNAPSHOT ERROR]:', err);
-      callback(INITIAL_HIGHLIGHTS);
+      if (err?.message?.includes('closing') || err?.message?.includes('hidden')) {
+        return;
+      }
+      console.warn('[FIRESTORE HIGHLIGHTS SNAPSHOT WARNING]:', err);
     }
   );
 }
@@ -743,7 +757,7 @@ export async function fetchHighlightsFromFirebase(): Promise<Highlight[]> {
     const hlRef = collection(db, HIGHLIGHTS_COLLECTION);
     const snap = await getDocs(hlRef);
     if (snap.empty) {
-      return INITIAL_HIGHLIGHTS;
+      return [];
     }
     const list: Highlight[] = [];
     snap.forEach((d) => {
@@ -755,13 +769,15 @@ export async function fetchHighlightsFromFirebase(): Promise<Highlight[]> {
         displayOrder: typeof data.displayOrder === 'number' ? data.displayOrder : 999,
         views: typeof data.views === 'number' ? data.views : 0,
         clicks: typeof data.clicks === 'number' ? data.clicks : 0,
+        published: data.published !== false,
+        featured: data.featured === true,
       });
     });
     list.sort((a, b) => (a.displayOrder || 999) - (b.displayOrder || 999));
     return list;
   } catch (err) {
     console.error('[FIRESTORE FETCH HIGHLIGHTS ERROR]:', err);
-    return INITIAL_HIGHLIGHTS;
+    return [];
   }
 }
 
@@ -790,6 +806,7 @@ export async function saveHighlightToFirebase(highlight: Highlight): Promise<Hig
     updatedAt: new Date().toISOString(),
   };
   await setDoc(hlRef, dataToSave, { merge: true });
+  console.log(`[FIRESTORE] Successfully saved highlight doc ID: ${highlightId}`);
   return dataToSave;
 }
 
@@ -800,6 +817,7 @@ export async function updateHighlightInFirebase(
   highlightId: string,
   updates: Partial<Highlight>
 ): Promise<void> {
+  if (!highlightId) throw new Error('Highlight ID is required');
   const hlRef = doc(db, HIGHLIGHTS_COLLECTION, highlightId);
   await updateDoc(hlRef, {
     ...updates,
@@ -811,8 +829,12 @@ export async function updateHighlightInFirebase(
  * Delete a Highlight completely from Firestore.
  */
 export async function deleteHighlightFromFirebase(highlightId: string): Promise<void> {
+  if (!highlightId) {
+    throw new Error('Valid Highlight Document ID is required for deletion.');
+  }
   const hlRef = doc(db, HIGHLIGHTS_COLLECTION, highlightId);
   await deleteDoc(hlRef);
+  console.log(`[FIRESTORE] Deleted highlight doc ID: ${highlightId}`);
 }
 
 /**

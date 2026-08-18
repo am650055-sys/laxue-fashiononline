@@ -56,6 +56,49 @@
         "upiEnabled": { "type": "boolean" },
         "updatedAt": { "type": "string" }
       }
+    },
+    "Highlight": {
+      "title": "Highlight",
+      "description": "Promotional banner and video lookbook highlights CMS entity",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "coverImage": { "type": "string" },
+        "buttonText": { "type": "string" },
+        "buttonLink": { "type": "string" },
+        "displayOrder": { "type": "number" },
+        "published": { "type": "boolean" },
+        "featured": { "type": "boolean" },
+        "views": { "type": "number" },
+        "clicks": { "type": "number" },
+        "media": { "type": "array" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["name", "coverImage"]
+    },
+    "CustomerReview": {
+      "title": "CustomerReview",
+      "description": "Customer story review and unboxing highlights entity",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "customerName": { "type": "string" },
+        "location": { "type": "string" },
+        "reviewText": { "type": "string" },
+        "rating": { "type": "number" },
+        "coverImage": { "type": "string" },
+        "isVerified": { "type": "boolean" },
+        "displayOrder": { "type": "number" },
+        "published": { "type": "boolean" },
+        "media": { "type": "array" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["customerName", "reviewText"]
     }
   },
   "firestore": {
@@ -82,6 +125,14 @@
     "/banners/{bannerId}": {
       "schema": "Setting",
       "description": "Marketing banners"
+    },
+    "/customerReviews/{reviewId}": {
+      "schema": "CustomerReview",
+      "description": "Customer video & photo story highlights"
+    },
+    "/highlights/{highlightId}": {
+      "schema": "Highlight",
+      "description": "Large promotional fashion lookbook highlights"
     }
   }
 }
